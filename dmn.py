@@ -17,6 +17,9 @@ from episodic_memory_module import EpisodicMemoryModule
 # TODO: train vs. use. Correct output.
 
 class DynamicMemoryNetwork():
+    """
+    An attempt to implement the Dynamic Memory Network from https://arxiv.org/pdf/1603.01417.pdf using keras
+    """
     def __init__(self, configs, model_folder):
 
         pass
