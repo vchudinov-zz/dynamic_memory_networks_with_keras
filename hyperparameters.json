@@ -1,0 +1,10 @@
+{
+  'batch_size': 32,
+  'epochs': 10,
+  'hidden_units': 64,
+  'l_rate': 1e-3,
+  
+  'model_name': 'test',
+  'model_folder': '',
+  'log_folder': ''
+}

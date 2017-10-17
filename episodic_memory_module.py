@@ -2,7 +2,7 @@ from keras.layers import Bidirectional, Dense
 from keras.layers.recurrent import GRU
 
 class EpisodicMemoryModule(Layer):
-    def __init__(self,attn_units, attention_type, memory_units, memory_type, memory_steps, output_dim, **kwargs):
+    def __init__(self, attn_units, attention_type, memory_units, memory_type, memory_steps, **kwargs):
         """
         The episodic memory consists of two nested networks + other details.
         The inner network is used to generate an episode, based on the incoming
@@ -68,7 +68,7 @@ class EpisodicMemoryModule(Layer):
 
     def generate_episode(self, facts, question, memory):
         episode = K.zeros(shape=facts[0].get_shape())
-        # TODO: Consider stacking these, instead of running with a loop. 
+        # TODO: Consider stacking these, instead of running with a loop.
 
         for f_i in facts:
             # Attention! Attention! Attention!

@@ -4,6 +4,8 @@ import numpy as np
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 
+# TODO: Add proper labels.
+
 def get_tokenizer(texts, max_words):
 
     tokenizer = Tokenizer(num_words=max_words,

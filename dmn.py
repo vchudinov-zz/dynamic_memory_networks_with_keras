@@ -8,110 +8,80 @@ from keras import optimizers
 from input_module import InputModule
 from episodic_memory_module import EpisodicMemoryModule
 
-
-
-
-
-
-class DynamicMemoryNetwork():
-    def __init__(self, configs):
-        self.gru_units = 0
-        pass
-
-    def train_model(x, xq, y, tx, txq, ty):
-        checkpoint = keras.callbacks.ModelCheckpoint(filepath,
-                                                    #monitor='val_loss',
-                                                    monitor='train_loss'
-                                                    verbose=0,
-                                                    save_best_only=True,
-                                                    save_weights_only=False,
-                                                    mode='auto',
-                                                    period=1)
-        logger = keras.callbacks.CSVLogger(filename, separator=',', append=False)
-
-
-        opt = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
-        self.model.compile(optimizer=opt, loss ="categorical_crossentropy", metrics=["accuracy"])
-
-        train_history = model.fit([x, xq], y,
-            callbacks = [checkpoint, logger],
-            validation_split = 0.1
-          batch_size=batch_size,
-          epochs=epochs,
-          validation_split=0.05)
-
-
-        loss, acc = model.evaluate([tx, txq], ty,
-                    batch_size=batch_size)
-
-
-
-    def build_inference_graph(inputs, question, lr,decay, ):
-
-        facts, question = InputModule()(inputs, question)
-        memory = EpisodicMemoryModule()(facts, question)
-        # TODO: What about recurrent activation of memories?
-        answer = layers.Dense(units=vocab_size, activation=None)(K.concatenate(memory,question))
-
-
-        self.model = Model(inputs=[facts, question], outputs=answer)
-
-
-
-    def save_model(path):
-        model_arch = self.model.to_json()
-        self.model.save_model(path)
-        pass
-
-    def get_predictions(self, output):
-        preds = tf.nn.softmax(output)
-        pred = tf.argmax(preds, 1)
-        return pred
-
-def run_epoch(session, data, num_epoch=0, verbose=2, train=False):
-
-        total_steps = len(data[0]) // config.batch_size
-        total_loss = []
-        accuracy = 0
-
-        # shuffle data
-        p = np.random.permutation(len(data[0]))
-        qp, ip, ql, il, im, a, r = data
-        qp, ip, ql, il, im, a, r = qp[p], ip[p], ql[p], il[p], im[p], a[p], r[p]
-
-        for step in range(total_steps):
-            index = range(step*config.batch_size,(step+1)*config.batch_size)
-            feed = {self.question_placeholder: qp[index],
-                  self.input_placeholder: ip[index],
-                  self.question_len_placeholder: ql[index],
-                  self.input_len_placeholder: il[index],
-                  self.answer_placeholder: a[index],
-                  self.rel_label_placeholder: r[index],
-                  self.dropout_placeholder: dp}
-            loss, pred, summary, _ = session.run(
-              [self.calculate_loss, self.pred, self.merged, train_op], feed_dict=feed)
-
-            if train_writer is not None:
-                train_writer.add_summary(summary, num_epoch*total_steps + step)
-
-            answers = a[step*config.batch_size:(step+1)*config.batch_size]
-            accuracy += np.sum(pred == answers)/float(len(answers))
-
-
-            total_loss.append(loss)
-            if verbose and step % verbose == 0:
-                sys.stdout.write('\r{} / {} : loss = {}'.format(
-                  step, total_steps, np.mean(total_loss)))
-                sys.stdout.flush()
-
-
-        if verbose:
-            sys.stdout.write('\r')
-
-return np.mean(total_loss), accuracy/float(total_steps)
-
-
+# TODO: Maybe extend keras.Model
 # TODO: Define optimizer, epochs, training
 # TODO: Define loading, processing data
 # TODO: Metrics and logging
 # TODO: Saving and deploying
+# TODO: What about recurrent activation of memories?
+# TODO: train vs. use. Correct output.
+
+class DynamicMemoryNetwork():
+    def __init__(self, configs, model_folder):
+
+        pass
+
+    def fit(train_x,
+            train_q,
+            train_y,
+            batch_size=32,
+            epochs=10
+            l_rate=1e-3,
+            l_decay=0,
+            save_criteria='train_loss'
+            log_location):
+
+        model = self.build_inference_graph(train_x, train_q)
+        opt = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+        self.model.compile(optimizer=opt, loss ="categorical_crossentropy", metrics=["accuracy"])
+        checkpoint = keras.callbacks.ModelCheckpoint(filepath,
+                                            monitor=save_criteria
+                                            verbose=0,
+                                            save_best_only=True,
+                                            save_weights_only=False,
+                                            mode='auto',
+                                            period=1)
+        logger = keras.callbacks.CSVLogger(log_location, separator=',', append=False)
+
+        train_history = model.fit([x, xq], y,
+            callbacks = [checkpoint, logger],
+            validation_split = 0.1,
+            batch_size=batch_size,
+            epochs=epochs)
+
+          return train_history
+
+
+    def validate_model(x, xq, y):
+        loss, acc = model.evaluate([x, xq], y,
+                    batch_size=batch_size)
+        return loss, acc
+
+    def build_inference_graph(inputs, question):
+
+        facts, question = InputModule( input_shape=inputs.shape,
+                                       question_shape=question.shape,
+                                       units=64,
+                                       dropout=0.0)(inputs, question)
+
+        memory = EpisodicMemoryModule(attn_units=64,
+                                      attention_type='soft',
+                                      memory_units=64,
+                                      memory_type='RELU',
+                                      memory_steps=max_seq)(facts, question)
+
+        answer = layers.Dense(units=self.vocab_size, activation=None)(K.concatenate(memory,question))
+
+        prediction = K.softmax(answer)
+        prediction = K.argmax(answer,1)
+        # TODO: train vs. use. Correct output.
+        self.model = Model(inputs=[facts, question], outputs=answer)
+
+    def save_model(path):
+        #model_arch = self.model.to_json()
+        #TODO dump model_arch
+        self.model.save_model(path)
+
+# Convert labels to categorical one-hot encoding
+#
+#one_hot_labels = keras.utils.to_categorical(labels, num_classes=10)
