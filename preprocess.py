@@ -72,15 +72,16 @@ def get_positional_encoding(MAX_SEQUENCE_LENGTH, EMBEDDING_DIM):
     return np.transpose(encoding)
 
 def process_texts(task, tokenizer, emb_matrix, max_seq, positional_encoding=None):
-    task = tokenzier.texts_to_sequences(task)
+    task = tokenizer.texts_to_sequences(task)
+    task = [embed_sentence(sentence=s, emb_matrix=emb_matrix) for s in task]
     task = pad_sequences(task, max_seq)
-    task = [embed_sentence(sentence=s) for s in task]
+
     if positional_encoding is not None:
         task = np.sum(task*positional_encoding, axis=2)
     return task
 
 # Taken from https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow
-def load_babi(fname, split_sentences, emb_matrix, tokenizer, max_seq, max_q, positional_encoding):
+def load_babi(fname, emb_matrix, tokenizer, max_seq, max_q, positional_encoding):
 
     print("==> Loading test from %s" % fname)
     tasks = []
@@ -109,31 +110,40 @@ def load_babi(fname, split_sentences, emb_matrix, tokenizer, max_seq, max_q, pos
         else:
             idx = line.find('?')
             tmp = line[idx+1:].split('\t')
-            task["Q"] = process_texts(line[:idx].split(' '))
-            task["A"] = process_texts(tmp[1].strip())
+            task["Q"] = process_texts(line[:idx].split(' '), emb_matrix=emb_matrix, tokenizer=tokenizer, max_seq=max_q)
+            task["A"] = process_texts(tmp[1].strip(), emb_matrix=emb_matrix, tokenizer=tokenizer,max_seq=1)
             task["L"] = []
             for num in tmp[2].split():
                 task["L"].append(id_map[int(num.strip())])
-            task['C'] = process_texts(task['C'], positional_encoding=positional_encoding)
+            task['C'] = process_texts(task['C'], emb_matrix=emb_matrix, tokenizer=tokenizer, max_seq=max_seq, positional_encoding=positional_encoding)
             task["ID"] = task_counter
-            task_counter+-=1
+            task_counter+=1
             tasks.append(task.copy())
 
     return tasks
 
-def laod_dataset(path_to_set, tokenizer=None, path_to_embs):
+def load_dataset(path_to_set, path_to_embs, max_seq, emb_dim, tokenizer=None ):
 
     embeddings = load_embeddings(path_to_embs=path_to_embs)
-    positional_encoding = get_positional_encoding(max_seq, emb_dim)
     tokenizer, word_index = get_tokenizer(open(path_to_set, 'r').readlines(), 50)
+    matrix = generate_embeddings_matrix(word_index, embeddings, emb_dim, max_seq)
+
+    positional_encoding = get_positional_encoding(max_seq, emb_dim)
+
     max_q = 0
     max_seq = 0
     max_words = 1000
 
-    tasks = init_babi(dataset, tokenizer, max_seq)
+    tasks = load_babi(path_to_set, matrix, tokenizer, max_seq, max_seq, positional_encoding)
 
     x = [x['C'] for x in tasks]
     x_q = [x['Q'] for x in tasks]
     y = [x['A'] for x in tasks]
 
     return x, x_q, y
+if __name__ == "__main__":
+    path_to_embs = "/home/penguinofdoom/Downloads/glove.6B/glove.6B.50d.txt"
+    path_to_set = "/home/penguinofdoom/Downloads/tasks_1-20_v1-2/en-10k/qa1_single-supporting-fact_train.txt"
+    max_seq = 20
+    emb_dim = 50
+    x, x_q, y = load_dataset(path_to_set, path_to_embs, max_seq, emb_dim)
