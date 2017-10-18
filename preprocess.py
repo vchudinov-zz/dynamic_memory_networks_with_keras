@@ -83,11 +83,12 @@ def process_texts(sentences, tokenizer, emb_matrix, max_seq, positional_encoding
     return sentences
 
 # Taken from https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow
-def encode_tasks(tasks, tokenizer, embeddings_matrix,max_seq, positional_encoding):
+def encode_tasks(tasks, tokenizer, task_labels, embeddings_matrix,max_seq, positional_encoding):
     for task in tasks:
         task['C'] = process_texts(task['C'],  tokenizer, embeddings_matrix, max_seq, positional_encoding=positional_encoding)
         print(task["Q"])
         task['Q'] = process_texts([task['Q']], tokenizer, embeddings_matrix, max_seq)[0]
+        task['L'] = np.eye(len(task_labels))[task_labels.index(task["A"])]
         task['A'] = process_texts([task['A']], tokenizer, embeddings_matrix, max_seq)[0]
     return tasks
 
@@ -109,7 +110,7 @@ def get_tasks(babi_task_location):
 
         if id == 1:
             #  C - text; Q - question, A - answer, L - label, ID - task number
-            task = {"C": [], "Q": "", "A": "", "L": "", "ID": ""}
+            task = {"C": [], "Q": "", "A": "", "S": "", "ID": ""}
             counter = 0
             id_map = {}
 
@@ -141,7 +142,7 @@ def get_tasks(babi_task_location):
 
             tasks.append(task.copy())
 
-    return tasks, task_labels
+    return tasks, list(task_labels)
 
 def load_dataset(path_to_set, path_to_embs, emb_dim, tokenizer=None ):
 
@@ -150,10 +151,11 @@ def load_dataset(path_to_set, path_to_embs, emb_dim, tokenizer=None ):
     matrix = generate_embeddings_matrix(tokenizer.word_index, embeddings, emb_dim, max_seq)
     positional_encoding = get_positional_encoding(max_seq, emb_dim)
     tasks, task_labels = get_tasks(babi_task_location=path_to_set)
-    tasks = encode_tasks(tasks, tokenizer=tokenizer, embeddings_matrix=matrix,  max_seq=max_seq, positional_encoding=positional_encoding)
+    tasks = encode_tasks(tasks, task_labels=task_labels, tokenizer=tokenizer, embeddings_matrix=matrix,  max_seq=max_seq, positional_encoding=positional_encoding)
     x = [x['C'] for x in tasks]
     x_q = [x['Q'] for x in tasks]
     y = [x['A'] for x in tasks]
+    l = [x['L'] for x in tasks]
 
 
-    return x, x_q, y
+    return x, x_q, y, l
