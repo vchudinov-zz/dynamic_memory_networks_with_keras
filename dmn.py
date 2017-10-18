@@ -62,21 +62,21 @@ class DynamicMemoryNetwork():
 
     def build_inference_graph(inputs, question):
 
-        facts, question = InputModule( input_shape=inputs.shape,
+        facts, question = InputModule( input_shape=(self.batch_size, inputs.shape),
                                        question_shape=question.shape,
                                        units=64,
                                        dropout=0.0)(inputs, question)
 
-        memory = EpisodicMemoryModule(attn_units=64,
-                                      attention_type='soft',
-                                      memory_units=64,
-                                      memory_type='RELU',
-                                      memory_steps=max_seq)(facts, question)
+        #memory = EpisodicMemoryModule(attn_units=64,
+        #                              attention_type='soft',
+        #                              memory_units=64,
+        #                              memory_type='RELU',
+    #                                  memory_steps=max_seq)(facts, question)
 
-        answer = layers.Dense(units=self.vocab_size, activation=None)(K.concatenate(memory,question))
+    #    answer = layers.Dense(units=self.vocab_size, activation=None)(K.concatenate(memory,question))
 
-        prediction = K.softmax(answer)
-        prediction = K.argmax(answer,1)
+    #    prediction = K.softmax(answer)
+#        prediction = K.argmax(answer,1)
         # TODO: train vs. use. Correct output.
         self.model = Model(inputs=[facts, question], outputs=answer)
 

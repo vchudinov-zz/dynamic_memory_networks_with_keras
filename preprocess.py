@@ -149,11 +149,7 @@ def get_tasks(babi_task_location):
 
         # if not a question
         if line.find('?') == -1:
-
-            #line = line.split(' ')
-
             task["C"].append(line)
-
             id_map[id] = counter
             counter += 1
 
