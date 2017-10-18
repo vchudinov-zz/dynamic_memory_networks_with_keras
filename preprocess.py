@@ -20,6 +20,8 @@ def get_tokenizer(texts, max_words):
     return tokenizer, max_seq, max_q
 
 def tokenize_data(texts, max_seq, max_words, tokenizer=None):
+    """
+    """
     # TODO: Stream loading of new data.
 
     if tokenizer is None:
@@ -44,6 +46,10 @@ def load_embeddings(path_to_embs):
     return embeddings_index
 
 def generate_embeddings_matrix(word_index, embeddings_index, EMBEDDING_DIM, MAX_SEQUENCE_LENGTH, matrix_only=False):
+    """
+    Generates an embeddings matrix from existing embeddings and a word index.
+    From keras blog
+    """
     embedding_matrix = np.zeros((len(word_index) + 1, EMBEDDING_DIM))
     for word, i in word_index.items():
 
@@ -57,23 +63,26 @@ def generate_embeddings_matrix(word_index, embeddings_index, EMBEDDING_DIM, MAX_
             embedding_matrix[i] = np.random.uniform(0.0,1.0,(EMBEDDING_DIM,))
     return embedding_matrix
 
-def embed_sentence(sentence, emb_matrix):
 
-    return [emb_matrix[word_index] for word_index in sentence]
-
-def get_positional_encoding(MAX_SEQUENCE_LENGTH, EMBEDDING_DIM):
-    """Position encoding described in section 4.1 in "End to End Memory Networks" (http://arxiv.org/pdf/1503.08895v5.pdf)"""
-    encoding = np.ones((EMBEDDING_DIM, MAX_SEQUENCE_LENGTH), dtype=np.float32)
-    ls = MAX_SEQUENCE_LENGTH+1
-    le = EMBEDDING_DIM+1
+def get_positional_encoding(max_seq, emb_size):
+    """ Position encoding described in section 4.1 in "End to End Memory Networks" (http://arxiv.org/pdf/1503.08895v5.pdf)
+        From https://github.com/domluna/memn2n
+    """
+    encoding = np.ones((emb_size, max_seq), dtype=np.float32)
+    ls = max_seq+1
+    le = emb_size+1
     for i in range(1, le):
         for j in range(1, ls):
             encoding[i-1, j-1] = (i - (le-1)/2) * (j - (ls-1)/2)
-    encoding = 1 + 4 * encoding / EMBEDDING_DIM / MAX_SEQUENCE_LENGTH
-    #encoding[:, -1] = 1.0 # TODO maybe remove
+    encoding = 1 + 4 * encoding / emb_size / max_seq
+    encoding[:, -1] = 1.0 # TODO maybe remove
     return np.transpose(encoding)
 
-def process_texts(sentences, tokenizer, emb_matrix, max_seq, positional_encoding=None):
+def process_sentences(sentences, tokenizer, emb_matrix, max_seq, positional_encoding=None):
+
+    def embed_sentence(sentence, emb_matrix):
+        return [emb_matrix[word_index] for word_index in sentence]
+
     sentences = tokenizer.texts_to_sequences(sentences)
     sentences = pad_sequences(sentences, max_seq)
     sentences = [embed_sentence(sentence=s, emb_matrix=emb_matrix) for s in sentences]
@@ -83,19 +92,39 @@ def process_texts(sentences, tokenizer, emb_matrix, max_seq, positional_encoding
     return sentences
 
 # Taken from https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow
-def encode_tasks(tasks, tokenizer, task_labels, embeddings_matrix,max_seq, positional_encoding):
+def encode_tasks(tasks, tokenizer, task_labels, embeddings_matrix, positional_encoding, max_seq):
+    """
+    Args:
+        tasks (list) of (dict)s : holds all tasks
+        tokenizer (keras.preprocessing.text.Tokenizer) - pre-trained tokenizer object used to encode inputs
+        task_labels (list) : containing the unique set of answers for all tasks. Used to generate one-hot labels
+        embeddings_matrix (np.array) : holds an embeddings_matrix for the dataset
+        positional_encoding (np.array) : matrix used for positional_encoding of inputs
+        max_seq (int) : the maximum sequence length. Used for padding.
+
+    Return:
+        (list) of (dict)s where each dict holds the embedded representations of the tasks in the dataset
+    """
     for task in tasks:
-        task['C'] = process_texts(task['C'],  tokenizer, embeddings_matrix, max_seq, positional_encoding=positional_encoding)
-        print(task["Q"])
-        task['Q'] = process_texts([task['Q']], tokenizer, embeddings_matrix, max_seq)[0]
+        task['C'] = process_sentences(task['C'],  tokenizer, embeddings_matrix, max_seq, positional_encoding=positional_encoding)
+        task['Q'] = process_sentences([task['Q']], tokenizer, embeddings_matrix, max_seq)[0]
         task['L'] = np.eye(len(task_labels))[task_labels.index(task["A"])]
-        task['A'] = process_texts([task['A']], tokenizer, embeddings_matrix, max_seq)[0]
+        task['A'] = process_sentences([task['A']], tokenizer, embeddings_matrix, max_seq)[0]
     return tasks
 
 def get_tasks(babi_task_location):
     """
     Retrieves Babi tasks into a readable dictionary form.
+    Each task is represented as a dicitonary that contains the task facts,
+    the task question, answer, the indices of the supporting facts, and the task
+    ID.
+
     Taken from https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow/
+
+    Args:
+        babi_task_location (str) : path to a file containing babi tasks
+    Returns:
+        (list) of (dict)s holding a readable representation of the tasks
     """
     # TODO Add onehot label
 
@@ -109,7 +138,7 @@ def get_tasks(babi_task_location):
         id = int(line[0:line.find(' ')])
 
         if id == 1:
-            #  C - text; Q - question, A - answer, L - label, ID - task number
+            #  C - text; Q - question, A - answer, S - suporting fact, ID - task number
             task = {"C": [], "Q": "", "A": "", "S": "", "ID": ""}
             counter = 0
             id_map = {}
@@ -145,9 +174,20 @@ def get_tasks(babi_task_location):
     return tasks, list(task_labels)
 
 def load_dataset(path_to_set, path_to_embs, emb_dim, tokenizer=None ):
+    """
+    Loads a babi dataset.
+    Args:
+        path_to_set (str) : path to the babi dataset you want to use
+        path_to_embs (str) : path to  a file holding pretrained word embeddings
+        emb_dim (int) : size of the word embeddings to use
+        tokenizer (keras.preprocessing.text.Tokenizer) - tokenizer object used to encode inputs
+    Return:
+        (list), (list) , (list), (list): the encoded inputs, questions, answers and one-hot labels ready to be used by the model
+    """
 
     embeddings = load_embeddings(path_to_embs=path_to_embs)
-    tokenizer, max_seq, max_q = get_tokenizer(open(path_to_set, 'r').readlines(), 10000)
+    if tokenizer is not None:
+        tokenizer, max_seq, max_q = get_tokenizer(open(path_to_set, 'r').readlines(), 10000)
     matrix = generate_embeddings_matrix(tokenizer.word_index, embeddings, emb_dim, max_seq)
     positional_encoding = get_positional_encoding(max_seq, emb_dim)
     tasks, task_labels = get_tasks(babi_task_location=path_to_set)
