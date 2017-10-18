@@ -1,4 +1,3 @@
-
 import numpy as np
 
 from keras.preprocessing.text import Tokenizer
@@ -10,13 +9,15 @@ def get_tokenizer(texts, max_words):
 
     tokenizer = Tokenizer(num_words=max_words,
                         filters='!"#$%&()*+,-./:;=?@[\\]^_`{|}~\t\n',
-                        lower=True,
+                        lower=True,#
                         split=" ",
                         char_level=False)
     tokenizer.fit_on_texts(texts)
-    word_index = tokenizer.word_index
-    print('Found %s unique tokens.' % len(word_index))
-    return tokenizer, word_index
+
+    print('Found %s unique tokens.' % len(tokenizer.word_index))
+    max_seq = max([len(text.split(' '))for text in texts if "?" not in text])
+    max_q = max([len(text.split('\t')[0].split(" "))for text in texts if "?" in text])
+    return tokenizer, max_seq, max_q
 
 def tokenize_data(texts, max_seq, max_words, tokenizer=None):
     # TODO: Stream loading of new data.
@@ -57,6 +58,7 @@ def generate_embeddings_matrix(word_index, embeddings_index, EMBEDDING_DIM, MAX_
     return embedding_matrix
 
 def embed_sentence(sentence, emb_matrix):
+
     return [emb_matrix[word_index] for word_index in sentence]
 
 def get_positional_encoding(MAX_SEQUENCE_LENGTH, EMBEDDING_DIM):
@@ -71,27 +73,43 @@ def get_positional_encoding(MAX_SEQUENCE_LENGTH, EMBEDDING_DIM):
     #encoding[:, -1] = 1.0 # TODO maybe remove
     return np.transpose(encoding)
 
-def process_texts(task, tokenizer, emb_matrix, max_seq, positional_encoding=None):
-    task = tokenizer.texts_to_sequences(task)
-    task = [embed_sentence(sentence=s, emb_matrix=emb_matrix) for s in task]
-    task = pad_sequences(task, max_seq)
+def process_texts(sentences, tokenizer, emb_matrix, max_seq, positional_encoding=None):
+    sentences = tokenizer.texts_to_sequences(sentences)
+    sentences = pad_sequences(sentences, max_seq)
+    sentences = [embed_sentence(sentence=s, emb_matrix=emb_matrix) for s in sentences]
 
     if positional_encoding is not None:
-        task = np.sum(task*positional_encoding, axis=2)
-    return task
+        sentences = np.sum(sentences*positional_encoding, axis=2)
+    return sentences
 
 # Taken from https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow
-def load_babi(fname, emb_matrix, tokenizer, max_seq, max_q, positional_encoding):
+def encode_tasks(tasks, tokenizer, embeddings_matrix,max_seq, positional_encoding):
+    for task in tasks:
+        task['C'] = process_texts(task['C'],  tokenizer, embeddings_matrix, max_seq, positional_encoding=positional_encoding)
+        print(task["Q"])
+        task['Q'] = process_texts([task['Q']], tokenizer, embeddings_matrix, max_seq)[0]
+        task['A'] = process_texts([task['A']], tokenizer, embeddings_matrix, max_seq)[0]
+    return tasks
 
-    print("==> Loading test from %s" % fname)
+def get_tasks(babi_task_location):
+    """
+    Retrieves Babi tasks into a readable dictionary form.
+    Taken from https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow/
+    """
+    # TODO Add onehot label
+
+    print("==> Loading test from %s" % babi_task_location)
     tasks = []
     task = None
     task_counter = 0
-    for i, line in enumerate(open(fname)):
+    task_labels = set()
+
+    for i, line in enumerate(open(babi_task_location)):
         id = int(line[0:line.find(' ')])
+
         if id == 1:
             #  C - text; Q - question, A - answer, L - label, ID - task number
-            task = {"C": ['<EOS>'], "Q": "", "A": "", "L": "", "ID": ""}
+            task = {"C": [], "Q": "", "A": "", "L": "", "ID": ""}
             counter = 0
             id_map = {}
 
@@ -101,49 +119,41 @@ def load_babi(fname, emb_matrix, tokenizer, max_seq, max_q, positional_encoding)
 
         # if not a question
         if line.find('?') == -1:
-            line = line.split(' ')
+
+            #line = line.split(' ')
 
             task["C"].append(line)
+
             id_map[id] = counter
             counter += 1
 
         else:
             idx = line.find('?')
             tmp = line[idx+1:].split('\t')
-            task["Q"] = process_texts(line[:idx].split(' '), emb_matrix=emb_matrix, tokenizer=tokenizer, max_seq=max_q)
-            task["A"] = process_texts(tmp[1].strip(), emb_matrix=emb_matrix, tokenizer=tokenizer,max_seq=1)
+            task["Q"] = line[:idx]
+            task["A"] = tmp[1].strip()
+            task_labels.add(task["A"])
             task["L"] = []
             for num in tmp[2].split():
                 task["L"].append(id_map[int(num.strip())])
-            task['C'] = process_texts(task['C'], emb_matrix=emb_matrix, tokenizer=tokenizer, max_seq=max_seq, positional_encoding=positional_encoding)
             task["ID"] = task_counter
             task_counter+=1
+
             tasks.append(task.copy())
 
-    return tasks
+    return tasks, task_labels
 
-def load_dataset(path_to_set, path_to_embs, max_seq, emb_dim, tokenizer=None ):
+def load_dataset(path_to_set, path_to_embs, emb_dim, tokenizer=None ):
 
     embeddings = load_embeddings(path_to_embs=path_to_embs)
-    tokenizer, word_index = get_tokenizer(open(path_to_set, 'r').readlines(), 50)
-    matrix = generate_embeddings_matrix(word_index, embeddings, emb_dim, max_seq)
-
+    tokenizer, max_seq, max_q = get_tokenizer(open(path_to_set, 'r').readlines(), 10000)
+    matrix = generate_embeddings_matrix(tokenizer.word_index, embeddings, emb_dim, max_seq)
     positional_encoding = get_positional_encoding(max_seq, emb_dim)
-
-    max_q = 0
-    max_seq = 0
-    max_words = 1000
-
-    tasks = load_babi(path_to_set, matrix, tokenizer, max_seq, max_seq, positional_encoding)
-
+    tasks, task_labels = get_tasks(babi_task_location=path_to_set)
+    tasks = encode_tasks(tasks, tokenizer=tokenizer, embeddings_matrix=matrix,  max_seq=max_seq, positional_encoding=positional_encoding)
     x = [x['C'] for x in tasks]
     x_q = [x['Q'] for x in tasks]
     y = [x['A'] for x in tasks]
 
+
     return x, x_q, y
-if __name__ == "__main__":
-    path_to_embs = "/home/penguinofdoom/Downloads/glove.6B/glove.6B.50d.txt"
-    path_to_set = "/home/penguinofdoom/Downloads/tasks_1-20_v1-2/en-10k/qa1_single-supporting-fact_train.txt"
-    max_seq = 20
-    emb_dim = 50
-    x, x_q, y = load_dataset(path_to_set, path_to_embs, max_seq, emb_dim)
