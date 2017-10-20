@@ -132,7 +132,7 @@ def embed_sentences(sentences, tokenizer, emb_matrix, max_seq=None, positional_e
     Args:
         sentences (list) of (str) : holds one or more sentences tha twill be tokenized and embedded.
         tokenizer (keras.preprocessing.text.Tokenizer) : A pre-trained tokenizer to take care of the embeddings.
-        max_seq (None) or (int) : the maximum sequence size in texts. Data will be padded to that size.If None - no padding. 
+        max_seq (None) or (int) : the maximum sequence size in texts. Data will be padded to that size.If None - no padding.
         positional_encoding (None) or (np.array): If not None, it will be applied to the embedded sentences.
     Return:
         (list) of (np.array)
@@ -148,7 +148,7 @@ def embed_sentences(sentences, tokenizer, emb_matrix, max_seq=None, positional_e
 
     if positional_encoding is not None:
         sentences = np.sum(sentences*positional_encoding, axis=2)
-    return sentences
+    return np.array(sentences)
 
 # Taken from https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow
 def encode_tasks(tasks, tokenizer, task_labels, embeddings_matrix, positional_encoding, max_seq):

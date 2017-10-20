@@ -8,7 +8,8 @@ from preprocess import embed_sentence
 from preprocess import get_positional_encoding
 
 class InputModule(Layer):
-    def __init__(self, input_shape, question_shape, units, dropout):
+
+    def __init__(self, units, input_shape, question_shape,  dropout):
         """
         Contains the input module for the DMN+
         The input module consists of a "diffusion layer" - a bidirectional GRU
@@ -16,23 +17,17 @@ class InputModule(Layer):
         a GRU layer that takes the question representation as input
         """
         # TODO Add other stuff
-        self.build()
+        self.build(units, input_shape, question_shape, dropout)
 
     def build(self, units, input_shape, question_shape, dropout=0.0):
         # TODO: GRU parameters
         gru_layer = GRU(input_shape = input_shape,
                         units=units,
                         activation='tanh',
-                        use_bias= True,
-                        kernel_initializer,
-                        recurrent_initializer,
-                        bias_initializer,
-                        kernel_regularizer,
-                        recurrent_regularizer,
-                        bias_regularizer,
-                        dropout,
-                        recurrent dropout
+                        use_bias=True,
+                        dropout = dropout
                         )
+
         self.facts_gru = Bidirectional(gru_layer)
         if dropout >= 0:
             # TODO: Does this make sense for both question and input? No.
