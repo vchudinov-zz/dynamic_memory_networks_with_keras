@@ -44,13 +44,16 @@ class InputModule(Layer):
                                 units=units)
         self.name = "Input_Module"
         self.built=True
+        print("Built")
 
-    def call(self, inputs_list):
+    def __call__(self, inputs_list):
+
         inputs = inputs_list[0]
         question = inputs_list[1]
-        fact_vectors = self.facts_gru.call(inputs)[0]
+
+        fact_vectors = self.facts_gru(inputs)
         fact_vectors = K.sum(K.stack(fact_vectors), axis=0)
-        question_vector = self.question_gru.call(question_vector)[0]
+        question_vector = self.question_gru(question_vector)
         if self.dropout is not None:
             fact_vectors = self.dropout.call(fact_vectors)
             question_vector = self.dropout.call(question_vector)

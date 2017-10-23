@@ -1,10 +1,10 @@
 from dmn import DynamicMemoryNetwork
 from preprocess import load_dataset
-
+import numpy as np
 batch_size = 5
 emb_dim = 50
-emb_location = ''
-babi_task_location = ''
+emb_location = '/home/penguinofdoom/Downloads/glove.6B/glove.6B.50d.txt'
+babi_task_location = '/home/penguinofdoom/Downloads/tasks_1-20_v1-2/en-10k/qa1_single-supporting-fact_train.txt'
 model_folder="dmn"
 input_units = 16
 episodic_memory_units = 16
@@ -23,6 +23,6 @@ dmn_net = DynamicMemoryNetwork( model_folder=model_folder,
                                 output_units=output_memory_units
                                 )
 print("Building Graph")
-dmn_net.build_inference_graph(x_train[:10], q_train[:10])
+dmn_net.build_inference_graph(np.array(x_train[:10]), np.array(q_train[:10]))
 print("Compiling model")
 dmn_net.model.compile()

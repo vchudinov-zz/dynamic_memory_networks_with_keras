@@ -75,8 +75,8 @@ class DynamicMemoryNetwork():
 
     def build_inference_graph(self, inputs, question ):
 
-        facts, question = InputModule( input_shape=(None, inputs[0].shape),
-                                       question_shape=(None, question[0].shape),
+        facts, question = InputModule( input_shape=([None] + list(inputs[0].shape)),
+                                       question_shape=([None] + list(question[0].shape)),
                                        units=64,
                                        dropout=0.0)([inputs, question])
         print("Input built")
@@ -92,7 +92,8 @@ class DynamicMemoryNetwork():
         #answer = layers.Dense(units=self.vocab_size, activation=None)(K.concatenate(memory,question))
 
         # One hot variant
-        answer = layers.Dense(units=self.num_classes, activation='softmax')(K.concatenate(memory,question))
+        concatenation = layers.Concatenate()([memory, question])
+        answer = layers.Dense(units=self.num_classes, activation='softmax')(concatenation)
         prediction = K.argmax(answer,1)
         # TODO: train vs. use. Correct output.
         self.model = Model(inputs=[facts, question], outputs=answer)

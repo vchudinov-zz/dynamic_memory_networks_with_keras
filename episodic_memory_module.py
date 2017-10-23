@@ -1,4 +1,4 @@
-from keras.layers import Bidirectional, Dense
+from keras.layers import Bidirectional, Dense, Concatenate
 from keras.engine.topology import Layer
 from keras.layers.recurrent import GRU
 
@@ -34,7 +34,7 @@ class EpisodicMemoryModule(Layer):
             self.attention_GRU = SoftAtnnGRU(units=attn_units)
         elif attention_type == 'gate':
             raise NotImplementedError
-
+        self.concat = Concatenate
         # Attention parameters
         self.W1 = self.add_weight(shape=(attn_units, 4*attn_units),
                                   name='g_W_1',
@@ -98,6 +98,7 @@ class EpisodicMemoryModule(Layer):
                 memory = self.memory_net.call(self.generate_episode(memory), memory)[0]
             elif self.memory_type == 'RELU':
                 episode = self.generate_episode(facts, question, memory)
-                memory = self.memory_net.call(K.concatenate([memory, episode, question]))
+                conc = self.concat([memory, episode, question])
+                memory = self.memory_net.call(conc)
                 #self.memories.append(memory) # Not sure if this will work
         return memory
