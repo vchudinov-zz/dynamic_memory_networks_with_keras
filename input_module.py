@@ -53,7 +53,7 @@ class InputModule(Layer):
 
         fact_vectors = self.facts_gru(inputs)
         fact_vectors = K.sum(K.stack(fact_vectors), axis=0)
-        question_vector = self.question_gru(question_vector)
+        question_vector = self.question_gru(question)
         if self.dropout is not None:
             fact_vectors = self.dropout.call(fact_vectors)
             question_vector = self.dropout.call(question_vector)

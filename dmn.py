@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 import os
 from keras.models import Model
+from keras.layers import Input, Concatenate
 from keras import optimizers
 from input_module import InputModule
 from episodic_memory_module import EpisodicMemoryModule
@@ -73,26 +74,27 @@ class DynamicMemoryNetwork():
                     batch_size=batch_size)
         return loss, acc
 
-    def build_inference_graph(self, inputs, question ):
+    def build_inference_graph(self, raw_inputs, question ):
 
-        facts, question = InputModule( input_shape=([None] + list(inputs[0].shape)),
-                                       question_shape=([None] + list(question[0].shape)),
+        inputs_tensor = Input(shape = raw_inputs[0].shape)
+        question_tensor = Input(shape = question[0].shape)
+
+
+        facts, question = InputModule( input_shape=raw_inputs[0].shape,
+                                       question_shape=question[0].shape,
                                        units=64,
-                                       dropout=0.0)([inputs, question])
-        print("Input built")
-        try:
-            memory = EpisodicMemoryModule(attn_units=64,
-                                          attention_type='soft',
-                                          memory_units=64,
-                                          memory_type='RELU',
-                                          memory_steps=max_seq)([facts, question])
-        except Exception as e:
-            print(e)
+                                       dropout=0.0)([inputs_tensor, question_tensor])
+
+        memory = EpisodicMemoryModule(attn_units=64,
+                                      attention_type='soft',
+                                      memory_units=64,
+                                      memory_type='RELU',
+                                      memory_steps=self.max_seq)([facts, question])
         # Embeddings variant.
         #answer = layers.Dense(units=self.vocab_size, activation=None)(K.concatenate(memory,question))
 
         # One hot variant
-        concatenation = layers.Concatenate()([memory, question])
+        concatenation = Concatenate()([memory, question])
         answer = layers.Dense(units=self.num_classes, activation='softmax')(concatenation)
         prediction = K.argmax(answer,1)
         # TODO: train vs. use. Correct output.
