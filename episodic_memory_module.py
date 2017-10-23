@@ -1,4 +1,5 @@
 from keras.layers import Bidirectional, Dense
+from keras.engine.topology import Layer
 from keras.layers.recurrent import GRU
 
 class EpisodicMemoryModule(Layer):
@@ -21,7 +22,7 @@ class EpisodicMemoryModule(Layer):
         self.build(attn_units, attention_type, memory_units, memory_type)
         super(EpisodicMemoryModule, self).__init__(**kwargs)
 
-    def build(self, attn_units, attention_type="soft", memory_units, memory_type='GRU'):
+    def build(self, attn_units, memory_units,attention_type="soft", memory_type='GRU'):
 
         # Memory parameters for attention and episodes
         if memory_type == 'GRU':
@@ -83,7 +84,9 @@ class EpisodicMemoryModule(Layer):
         return episode
 
 
-    def call(self, facts, question):
+    def call(self, inputs):
+        facts = inputs[0]
+        question = inputs[1]
         # TODO: Add Dropout and BatchNorm.
         self.memories = []
         # Initialize memory to the question
@@ -91,7 +94,7 @@ class EpisodicMemoryModule(Layer):
         self.memories.append(memory)
         for step in self.memory_steps:
             # iteratively update memory
-            if self.memory_type == 'GRU'
+            if self.memory_type == 'GRU':
                 memory = self.memory_net.call(self.generate_episode(memory), memory)[0]
             elif self.memory_type == 'RELU':
                 episode = self.generate_episode(facts, question, memory)

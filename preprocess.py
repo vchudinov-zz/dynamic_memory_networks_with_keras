@@ -144,7 +144,7 @@ def embed_sentences(sentences, tokenizer, emb_matrix, max_seq=None, positional_e
     sentences = tokenizer.texts_to_sequences(sentences)
     if max_seq is not None:
         sentences = pad_sequences(sentences, max_seq)
-    sentences = [embed_sentence(sentence=s, emb_matrix=emb_matrix) for s in sentences]
+    sentences = [np.array(embed_sentence(sentence=s, emb_matrix=emb_matrix)) for s in sentences]
 
     if positional_encoding is not None:
         sentences = np.sum(sentences*positional_encoding, axis=2)
