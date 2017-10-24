@@ -1,7 +1,8 @@
 from keras.layers import Bidirectional, Dense, Concatenate, Multiply, Subtract
 from keras.engine.topology import Layer
 from keras.layers.recurrent import GRU
-import keras.backend as K
+from keras import backend as K
+import tensorflow as tf
 
 class EpisodicMemoryModule(Layer):
     def __init__(self, attn_units, attention_type, memory_units, memory_type, memory_steps, **kwargs):
@@ -45,23 +46,31 @@ class EpisodicMemoryModule(Layer):
 
 
     def generate_episode(self, facts, question, memory):
-        episode = K.zeros(shape=facts[0].get_shape())
+
+        episode = K.zeros(shape=facts.get_shape())
+        facts = tf.unstack(facts)
+
+        print(episode.shape)
+        print(len(facts))
+        raise SystemExit
         # TODO: Consider stacking these, instead of running with a loop.
 
-        #for f_i in facts:
+        for f_i in facts:
             # Attention! Attention! Attention!
-        z_t_0 = self.multiply([facts, question, memory])
-        z_t_1 = K.abs(self.sub([facts, question]))
-        z_t_2 = K.abs(self.sub([facts, memory]))
-        z_t_i = self.concat([z_t_0, z_t_1, z_t_2], axis=1)
-        g_t_i = self.l_1(z_t_i)
-        g_t_i = self.l_2(g_t_i)
-        episode = self.attention_GRU(inputs=facts, state=episode, attn_gate=g_t_i)
+            z_t_0 = self.multiply([f_i, question, memory])
+            z_t_1 = K.abs(self.sub([f_i, question]))
+            z_t_2 = K.abs(self.sub([f_i, memory]))
+            z_t_i = self.concat([z_t_0, z_t_1, z_t_2], axis=1)
+            g_t_i = self.l_1(z_t_i)
+            g_t_i = self.l_2(g_t_i)
+            episode = self.attention_GRU(inputs=f_i, state=episode, attn_gate=g_t_i)
 
         return episode
 
 
     def __call__(self, inputs):
+        # TODO: Determine if I need transposes.
+
         facts = inputs[0]
         question = inputs[1]
         # TODO: Add Dropout and BatchNorm.

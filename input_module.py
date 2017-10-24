@@ -34,7 +34,7 @@ class InputModule(Layer):
                         dropout = dropout
                         )
 
-        self.facts_gru = Bidirectional(gru_layer)
+        self.facts_gru = Bidirectional(gru_layer, merge_mode='sum')
 
         if dropout >= 0:
             # TODO: Does this make sense for both question and input? No.
@@ -49,12 +49,19 @@ class InputModule(Layer):
     def __call__(self, inputs_list):
 
         inputs = inputs_list[0]
+        print(inputs.get_shape())
+
         question = inputs_list[1]
 
         fact_vectors = self.facts_gru(inputs)
-        fact_vectors = K.sum(K.stack(fact_vectors), axis=0)
+        print(fact_vectors.get_shape())
+        #fact_vectors = K.sum(fact_vectors, axis=0)
+        print(fact_vectors.get_shape())
+        raise SystemExit
         question_vector = self.question_gru(question)
         if self.dropout is not None:
             fact_vectors = self.dropout.call(fact_vectors)
             question_vector = self.dropout.call(question_vector)
+
+
         return fact_vectors, question_vector

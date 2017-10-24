@@ -147,7 +147,10 @@ def embed_sentences(sentences, tokenizer, emb_matrix, max_seq=None, positional_e
     sentences = [np.array(embed_sentence(sentence=s, emb_matrix=emb_matrix)) for s in sentences]
 
     if positional_encoding is not None:
-        sentences = np.sum(sentences*positional_encoding, axis=2)
+        # to get sentence representation
+        sentences = np.sum(np.array(sentences)*positional_encoding, axis=2)
+
+        # TODO axis - not sure about it.
     return np.array(sentences)
 
 # Taken from https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow
@@ -243,8 +246,7 @@ def load_dataset(path_to_set, embeddings_path, emb_dim, tokenizer_path=None ):
     # It iterates TWICE over the dataset, but hey, its not a big dataset.
     # Determine max sequence length. Will be used for question length too
     # Should be fine unless sentences are too long. In that case TODO
-    max_seq = max([len(text.split(' '))for text in open(embeddings_path, 'r').readlines()])
-
+    max_seq = 10
     # Load the GloVe embeddings
     embeddings_index = load_embeddings_index(embeddings_path=embeddings_path)
 
@@ -273,7 +275,8 @@ def load_dataset(path_to_set, embeddings_path, emb_dim, tokenizer_path=None ):
                           positional_encoding=positional_encoding)
 
     # and make them into convenient lists.
-    x = [x['C'] for x in tasks] # x_i holds all the facts for task_i
+    x = np.squeeze([x['C'] for x in tasks]) # x_i holds all the facts for task_i
+
     xq = [x['Q'] for x in tasks]
     word_y = [x['A'] for x in tasks] # word_y_i is the embedding for the answer for the task
     one_hot_y = [x['L'] for x in tasks] # one_hot_y_i is the corresponding one_hot answer

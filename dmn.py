@@ -77,14 +77,15 @@ class DynamicMemoryNetwork():
     def build_inference_graph(self, raw_inputs, question ):
 
         inputs_tensor = Input(shape = raw_inputs[0].shape)
+
         question_tensor = Input(shape = question[0].shape)
 
-
-        facts, question = InputModule( input_shape=raw_inputs[0].shape,
-                                       question_shape=question[0].shape,
-                                       units=64,
+        facts, question = InputModule( input_shape=raw_inputs.shape,
+                                       question_shape=question.shape,
+                                       units=16,
                                        dropout=0.0)([inputs_tensor, question_tensor])
-
+        print(facts.get_shape())
+        print("----------------")
         memory = EpisodicMemoryModule(attn_units=64,
                                       attention_type='soft',
                                       memory_units=64,
