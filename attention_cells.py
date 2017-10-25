@@ -1,8 +1,9 @@
 from keras import backend as K
 from keras.engine.topology import Layer
 import numpy as np
+from keras.layers.recurrent import GRU
 
-class SoftAtnnGRUCell(GRUCell):
+class SoftAtnnGRUCell(Layer):
 
     def build(self, input_shape):
         input_dim = input_shape[-1]
@@ -83,8 +84,7 @@ class SoftAtnnGRUCell(GRUCell):
                 h_tm1_z = h_tm1
                 h_tm1_r = h_tm1
                 h_tm1_h = h_tm1
-            z = self.recurrent_act  self.g_t = K.softmax(self.G_W_2*K.tanh(self.G_W_1*z_t_i + self.G_b_1) + self.G_b_2)ivation(x_z + K.dot(h_tm1_z,
-                                                      self.recurrent_kernel_z))
+            z = self.recurrent_act
             r = self.recurrent_activation(x_r + K.dot(h_tm1_r,
                                                       self.recurrent_kernel_r))
 
@@ -123,7 +123,7 @@ class SoftAtnnGRUCell(GRUCell):
                 h._uses_learning_phase = True
         return h, [h]
 
-class GatedAtnnGRUCell(GRUCell):
+class GatedAtnnGRUCell(Layer):
     # TODO: Implement
     def build(self, input_shape):
         input_dim = input_shape[-1]
@@ -205,8 +205,7 @@ class GatedAtnnGRUCell(GRUCell):
                 h_tm1_z = h_tm1
                 h_tm1_r = h_tm1
                 h_tm1_h = h_tm1
-            z = self.recurrent_act  self.g_t = K.softmax(self.G_W_2*K.tanh(self.G_W_1*z_t_i + self.G_b_1) + self.G_b_2)ivation(x_z + K.dot(h_tm1_z,
-                                                      self.recurrent_kernel_z))
+            z = self.recurrent_act
             r = self.recurrent_activation(x_r + K.dot(h_tm1_r,
                                                       self.recurrent_kernel_r))
 
@@ -245,10 +244,7 @@ class GatedAtnnGRUCell(GRUCell):
                 h._uses_learning_phase = True
         return h, [h]
 
-class AttnGRU(RNN):
-
-
-    @interfaces.legacy_recurrent_support
+class SoftAttnGRU(GRU):
     def __init__(self,
                  units,
                  attention_type='soft',

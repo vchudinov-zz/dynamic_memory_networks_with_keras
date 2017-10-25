@@ -23,6 +23,6 @@ dmn_net = DynamicMemoryNetwork( model_folder=model_folder,
                                 output_units=output_memory_units
                                 )
 print("Building Graph")
-dmn_net.build_inference_graph(np.array(x_train[:10]), np.array(q_train[:10]))
+dmn_net.build_inference_graph(np.array(x_train[:10]), np.array(q_train[:10]), batch_size=5)
 print("Compiling model")
 dmn_net.model.compile()

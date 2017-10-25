@@ -3,6 +3,7 @@ from keras.engine.topology import Layer
 from keras.layers.recurrent import GRU
 from keras import backend as K
 import tensorflow as tf
+from attention_cells import SoftAttnGRU
 
 class EpisodicMemoryModule(Layer):
     def __init__(self, attn_units, attention_type, memory_units, memory_type, memory_steps, **kwargs):
@@ -19,10 +20,10 @@ class EpisodicMemoryModule(Layer):
         self.memory_steps = memory_steps
         self.attention_type = attention_type
 
-        self.build(attn_units, attention_type, memory_units, memory_type)
+        self.build(attn_units, attention_type, memory_units, memory_type, )
         super(EpisodicMemoryModule, self).__init__(**kwargs)
 
-    def build(self, attn_units, memory_units, attention_type="soft", memory_type='GRU'):
+    def build(self,  attn_units, memory_units, attention_type="soft", memory_type='GRU'):
 
         # Memory parameters for attention and episodes
         if memory_type == 'GRU':
@@ -31,7 +32,7 @@ class EpisodicMemoryModule(Layer):
             self.memory_net = Dense(units=memory_units, activation='relu')
 
         if attention_type == 'soft':
-            self.attention_GRU = SoftAtnnGRU(units=attn_units)
+            self.attention_GRU = SoftAttnGRU(units=attn_units)
         elif attention_type == 'gate':
             raise NotImplementedError
         self.concat = Concatenate()
@@ -46,13 +47,13 @@ class EpisodicMemoryModule(Layer):
 
 
     def generate_episode(self, facts, question, memory):
+        facts = tf.unstack(facts, axis=1)
+        episode = K.zeros(shape=facts[0].get_shape())
 
-        episode = K.zeros(shape=facts.get_shape())
-        facts = tf.unstack(facts)
 
-        print(episode.shape)
-        print(len(facts))
-        raise SystemExit
+        #print(episode.shape)
+        #print(len(facts))
+        #raise SystemExit
         # TODO: Consider stacking these, instead of running with a loop.
 
         for f_i in facts:

@@ -74,21 +74,19 @@ class DynamicMemoryNetwork():
                     batch_size=batch_size)
         return loss, acc
 
-    def build_inference_graph(self, raw_inputs, question ):
+    def build_inference_graph(self, raw_inputs, question, batch_size=None ):
 
-        inputs_tensor = Input(shape = raw_inputs[0].shape)
+        inputs_tensor = Input(batch_shape = [batch_size] + list(raw_inputs[0].shape))
 
-        question_tensor = Input(shape = question[0].shape)
+        question_tensor = Input(batch_shape = [batch_size] + list(question[0].shape))
 
-        facts, question = InputModule( input_shape=raw_inputs.shape,
-                                       question_shape=question.shape,
-                                       units=16,
+        facts, question = InputModule( units=16,
                                        dropout=0.0)([inputs_tensor, question_tensor])
-        print(facts.get_shape())
-        print("----------------")
-        memory = EpisodicMemoryModule(attn_units=64,
+
+        memory = EpisodicMemoryModule(
+                                      attn_units=16,
                                       attention_type='soft',
-                                      memory_units=64,
+                                      memory_units=16,
                                       memory_type='RELU',
                                       memory_steps=self.max_seq)([facts, question])
         # Embeddings variant.
