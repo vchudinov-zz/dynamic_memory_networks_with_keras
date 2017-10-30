@@ -40,11 +40,10 @@ class InputModule(Layer):
             # TODO: Does this make sense for both question and input? No.
             self.dropout = Dropout(rate=dropout)
 
-        self.question_gru = GRU(units=units,
-                                return_sequences=True)
+        self.question_gru = GRU(units=units)
         self.name = "Input_Module"
         self.built=True
-        print("Built")
+
 
     def __call__(self, inputs_list):
 
@@ -55,7 +54,11 @@ class InputModule(Layer):
         f_shape = list(inputs.get_shape())
         f_shape[-1] = self.units
         fact_vectors.set_shape(f_shape)
+
         question_vector = self.question_gru(question)
+        q_shape = list(question.get_shape())
+        q_shape[-1] = self.units
+        question_vector.set_shape([q_shape[0], q_shape[-1]]) # VERY VERY HACKY TODO
 
         if self.dropout is not None:
             fact_vectors = self.dropout.call(fact_vectors)
