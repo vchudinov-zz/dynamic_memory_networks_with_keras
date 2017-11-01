@@ -216,6 +216,8 @@ class RNN(Layer):
             return output_mask
 
     def build(self, input_shape):
+        print("Am here")
+        raise SystemExit
         # Note input_shape will be list of shapes of initial states and
         # constants if these are passed in __call__.
         if self._num_constants is not None:
@@ -257,6 +259,7 @@ class RNN(Layer):
                                for dim in state_size]
         if self.stateful:
             self.reset_states()
+        self.built=True
 
     def get_initial_state(self, inputs):
         # build an all-zero tensor of shape (samples, output_dim)

@@ -109,7 +109,7 @@ class AttentionGate(Layer):
 
 
 class EpisodicMemoryModule(Layer):
-    def __init__(self, attn_units, attention_type, memory_units, memory_type, memory_steps, **kwargs):
+    def __init__(self, units, memory_type, memory_steps, **kwargs):
         """
         The episodic memory consists of two nested networks + other details.
         The inner network is used to generate an episode, based on the incoming
@@ -118,29 +118,24 @@ class EpisodicMemoryModule(Layer):
         with the new episodes.
 
         """
+        # TODO Readd attention type once this whole thing is solved
+        super(EpisodicMemoryModule, self).__init__()
         self.memories = []
         self.memory_type = memory_type
         self.memory_steps = memory_steps
-        self.attention_type = attention_type
+        self.name = "episodic_memory_module"
 
-        self.build(attn_units=attn_units, memory_units=memory_units, attention_type=attention_type, memory_type=memory_type)
-        super(EpisodicMemoryModule, self).__init__(**kwargs)
-
-    def build(self, attn_units, memory_units, attention_type="soft", memory_type='GRU'):
-
-        # Memory parameters for attention and episodes
+        self.units = units
         if memory_type == 'GRU':
-            self.memory_net = GRU(units=memory_units, return_sequences=True)
+            self.memory_net = GRU(units=units, return_sequences=True, stateful=True)
         elif memory_type == 'RELU':
-            self.memory_net = Dense(units=memory_units, activation='relu')
+            self.memory_net = Dense(units=units, activation='relu')
 
-        if attention_type == 'soft':
-            
-            self.attention_GRU = SoftAttnGRU(units=attn_units)
-        elif attention_type == 'gate':
-            raise NotImplementedError
         self.attention_gate = AttentionGate(50)
+        self.attention_GRU = SoftAttnGRU(units=units, stateful=True)
 
+
+    def build(self, input_shape):
         self.built = True
 
 
@@ -150,13 +145,21 @@ class EpisodicMemoryModule(Layer):
         print(f'Attention shape: {attentions.get_shape()}')
         print(f'Facts vectors shape : {facts.get_shape()}')
 
-        episode = self.attention_GRU.call([facts, attentions])
-        print(f'Episode shape: {episode.get_shape()}')
+        episode = self.attention_GRU.call(facts, attentions)
+        # TODO Hacky workaround.
+        # TODO: set proper shape infered from units and stuff.
+
+        #episode.set_shape(list(facts.get_shape()))
+        #episode = tf.unstack(episode, axis=1)
+        #episode = attentions*episode[-1] + (1-attentions)*episode[-2]
+
+        print(episode.get_shape())
         raise SystemExit
+        print(f'Episode shape: {episode.get_shape()}')
         return episode
 
 
-    def __call__(self, inputs):
+    def call(self, inputs):
         # TODO: Determine if I need transposes.
 
         facts = inputs[0]

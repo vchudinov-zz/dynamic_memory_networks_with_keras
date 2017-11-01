@@ -85,9 +85,7 @@ class DynamicMemoryNetwork():
                                        dropout=0.0)([inputs_tensor, question_tensor])
 
         memory = EpisodicMemoryModule(
-                                      attn_units=16,
-                                      attention_type='soft',
-                                      memory_units=16,
+                                      units=16,
                                       memory_type='RELU',
                                       memory_steps=self.max_seq)([facts, question])
         # Embeddings variant.
