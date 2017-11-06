@@ -18,11 +18,6 @@ class AttentionGate(Layer):
         # TODO: Change units to EMB_DIM
         self.l_1 = Dense(units=units,  activation = 'tanh')
         self.l_2 = Dense(units=1, activation='softmax')
-
-        self.build()
-        pass
-
-    def build(self):
         self.built = True
 
     def compute_output_shape(self, input_shape):
@@ -124,6 +119,7 @@ class EpisodicMemoryModule(Layer):
         self.memory_type = memory_type
         self.memory_steps = memory_steps
         self.name = "episodic_memory_module"
+        self.concat = Concatenate()
 
         self.units = units
         if memory_type == 'GRU':
@@ -132,30 +128,23 @@ class EpisodicMemoryModule(Layer):
             self.memory_net = Dense(units=units, activation='relu')
 
         self.attention_gate = AttentionGate(50)
-        self.attention_GRU = SoftAttnGRU(units=units, stateful=True)
+        self.attention_GRU = SoftAttnGRU(units=units)
+
 
 
     def build(self, input_shape):
-        self.built = True
+        self.attention_gate.build(input_shape[0])
+        self.attention_GRU.build(input_shape[0])
+        self.memory_net.build(input_shape[0])
+
+        super(EpisodicMemoryModule, self).build(input_shape)
+
 
 
     def generate_episode(self, facts, question, memory):
 
         attentions = self.attention_gate.call(facts, question, memory)
-        print(f'Attention shape: {attentions.get_shape()}')
-        print(f'Facts vectors shape : {facts.get_shape()}')
-
         episode = self.attention_GRU.call(facts, attentions)
-        # TODO Hacky workaround.
-        # TODO: set proper shape infered from units and stuff.
-
-        #episode.set_shape(list(facts.get_shape()))
-        #episode = tf.unstack(episode, axis=1)
-        #episode = attentions*episode[-1] + (1-attentions)*episode[-2]
-
-        print(episode.get_shape())
-        raise SystemExit
-        print(f'Episode shape: {episode.get_shape()}')
         return episode
 
 
