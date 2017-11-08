@@ -5,7 +5,7 @@ from keras import initializers
 from keras import regularizers
 from keras import constraints
 #from ..egine import Layer
-from keras.engine.topology import Layer
+from keras.engine.topology import Layer, _object_list_uid, _to_list
 from keras.layers.recurrent import Recurrent
 from keras.engine import InputSpec
 import numpy as np
@@ -35,11 +35,13 @@ class SoftAttnGRU(Layer):
                  dropout=0.,
                  recurrent_dropout=0.,
                  implementation=1,
+                 return_sequences=False,
                  **kwargs):
 
         super(SoftAttnGRU, self).__init__(**kwargs)
 
         self.units = units
+        self.return_sequences = return_sequences
         self.activation = activations.get(activation)
         self.recurrent_activation = activations.get(recurrent_activation)
         self.use_bias = use_bias
@@ -64,13 +66,22 @@ class SoftAttnGRU(Layer):
         self._recurrent_dropout_mask = None
         self.attn_gate = None
         self.states = [None]
+        self._input_map = {}
         super(SoftAttnGRU, self).__init__(**kwargs)
+
+    def compute_output_shape(self, input_shape):
+
+        out = list(input_shape[0])
+        out[-1] = self.units
+        if self.return_sequences:
+            return out
+        else:
+            return (out[0], out[-1])
 
     def build(self, input_shape):
 
-        self.input_spec = [InputSpec(shape=input_shape)]
         #self.states=self.reset_states()
-        input_dim = input_shape[-1]
+        input_dim = input_shape[0][-1]
 
         self.kernel = self.add_weight(shape=(input_dim, self.units * 3),
                                       name='kernel',
@@ -195,11 +206,12 @@ class SoftAttnGRU(Layer):
                     h._uses_learning_phase = True
             return h, [h]
 
-    def call(self, inputs, attn_gate, mask=None, training=None, initial_state=None, return_last_state=True):
+    def call(self, input_list, initial_state=None, return_last_state=True,mask=None, training=None):
+        inputs=input_list[0]
+        attn_gate = input_list[1]
+
         self._generate_dropout_mask(inputs, training=training)
         self._generate_recurrent_dropout_mask(inputs, training=training)
-        self.attn_gate = attn_gate
-
 
         kwargs = {}
         #if has_arg(self.layer.call, 'training'):
@@ -218,7 +230,10 @@ class SoftAttnGRU(Layer):
                                   initial_states=self.get_initial_state(inputs),
                                   input_length=input_shape[1],
                                   unroll=False)
-            y = outputs
+            if self.return_sequences:
+                y = outputs
+            else:
+                y = last_output
         else:
             # No batch size specified, therefore the layer will be able
             # to process batches of any size.
@@ -229,24 +244,19 @@ class SoftAttnGRU(Layer):
             # Shape: (num_samples * timesteps, ...). And track the
             # transformation in self._input_map.
             input_uid = _object_list_uid(inputs)
-            inputs = K.reshape(inputs, (-1,) + input_shape[2:])
-            self._input_map[input_uid] = facts
+            inputs = K.reshape(inputs, (-1,) + tuple(input_shape[2:]))
+            self._input_map[input_uid] = inputs
             # (num_samples * timesteps, ...)
-
+            y = self.step(inputs=inputs, states=K.zeros_like(inputs), attention = attn_gate)
             if hasattr(self, '_uses_learning_phasemy heart is in panama'):
                 uses_learning_phase = self._uses_learning_phase
             # Shape: (num_samples, timesteps, ...)
-            output_shape = self.compute_output_shape(input_shape)
-            y = K.reshape(y, (-1, input_length) + output_shape[2:])
+            output_shape = list(input_shape)
+            output_shape[-1] = self.units
+
+            y = K.reshape(y, (-1, input_length) + tuple(output_shape[2:]))
 
         # Apply activity regularizer if any:
-        if return_last_state:
-            if (hasattr(self, 'activity_regularizer') and
-               self.activity_regularizer is not None):
-                regularization_loss = self.activity_regularizer(last_output)
-                self.add_loss(regularization_loss, inputs)
-
-            return last_output # TODO verify this is what I want.
 
         if (hasattr(self, 'activity_regularizer') and
            self.activity_regularizer is not None):
@@ -255,13 +265,12 @@ class SoftAttnGRU(Layer):
 
         if uses_learning_phase:
             y._uses_learning_phase = True
+        if self.return_sequences:
 
-
-        timesteps = input_shape[1]
-        new_time_steps = list(y.get_shape())
-        new_time_steps[1] = timesteps
-        y.set_shape(new_time_steps)
-
+            timesteps = input_shape[1]
+            new_time_steps = list(y.get_shape())
+            new_time_steps[1] = timesteps
+            y.set_shape(new_time_steps)
 
         return y
 
@@ -517,8 +526,6 @@ class SoftAttnGRU(Layer):
 
             outputs = output_ta.stack()
             last_output = output_ta.read(last_time - 1)
-
-
 
         axes = [1, 0] + list(range(2, len(outputs.get_shape())))
         outputs = tf.transpose(outputs, axes)

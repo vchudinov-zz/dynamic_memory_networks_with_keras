@@ -5,7 +5,7 @@ import tensorflow as tf
 import numpy as np
 import os
 from keras.models import Model
-from keras.layers import Input, Concatenate
+from keras.layers import Input, Concatenate, Dense
 from keras import optimizers
 from input_module import InputModule
 from episodic_memory_module import EpisodicMemoryModule
@@ -88,15 +88,13 @@ class DynamicMemoryNetwork():
                                       units=16,
                                       memory_type='RELU',
                                       memory_steps=self.max_seq)([facts, question])
-        # Embeddings variant.
-        #answer = layers.Dense(units=self.vocab_size, activation=None)(K.concatenate(memory,question))
 
-        # One hot variant
-        concatenation = Concatenate()([memory, question])
-        answer = layers.Dense(units=self.num_classes, activation='softmax')(concatenation)
+        answer = Dense(units=self.num_classes)(memory)
+
         prediction = K.argmax(answer,1)
         # TODO: train vs. use. Correct output.
-        self.model = Model(inputs=[facts, question], outputs=answer)
+
+        self.model = Model(inputs=[inputs_tensor, question_tensor], outputs=answer)
 
     def save_model(self, path):
         #model_arch = self.model.to_json()

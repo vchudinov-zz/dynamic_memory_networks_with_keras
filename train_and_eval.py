@@ -1,6 +1,7 @@
 from dmn import DynamicMemoryNetwork
 from preprocess import load_dataset
 import numpy as np
+from keras import optimizers
 batch_size = 5
 emb_dim = 50
 emb_location = '/home/penguinofdoom/Downloads/glove.6B/glove.6B.50d.txt'
@@ -24,5 +25,6 @@ dmn_net = DynamicMemoryNetwork( model_folder=model_folder,
                                 )
 
 dmn_net.build_inference_graph(np.array(x_train[:10]), np.array(q_train[:10]), batch_size=5)
-dmn_net.model.compile()
+opt = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+dmn_net.model.compile(optimizer=opt, loss ="categorical_crossentropy", metrics=["accuracy"])
 print("Model compiled")
