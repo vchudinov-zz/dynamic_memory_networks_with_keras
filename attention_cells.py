@@ -80,7 +80,6 @@ class SoftAttnGRU(Layer):
 
     def build(self, input_shape):
 
-        #self.states=self.reset_states()
         input_dim = input_shape[0][-1]
 
         self.kernel = self.add_weight(shape=(input_dim, self.units * 3),
@@ -128,11 +127,8 @@ class SoftAttnGRU(Layer):
             # Needs question as an input
             x_i = inputs
             h_tm1 = states[0]
-
-
             # Last entry in states should be the attention gate.
             attn_gate = attention
-
             # Gate inputs
 
             # dropout matrices for input units
@@ -168,8 +164,7 @@ class SoftAttnGRU(Layer):
                     h_tm1_h = h_tm1
 
                 z = self.recurrent_activation(x_z + K.dot(h_tm1_z, self.recurrent_kernel_z))
-                r = self.recurrent_activation(x_r + K.dot(h_tm1_r,
-                                                          self.recurrent_kernel_r))
+                r = self.recurrent_activation(x_r + K.dot(h_tm1_r, self.recurrent_kernel_r))
 
                 hh = self.activation(x_h + K.dot(r * h_tm1_h,
                                                  self.recurrent_kernel_h))
@@ -217,8 +212,10 @@ class SoftAttnGRU(Layer):
         #if has_arg(self.layer.call, 'training'):
         self.training = training
         uses_learning_phase = False
+        initial_state = self.get_initial_state(inputs)
 
         input_shape = K.int_shape(inputs)
+        att_shape = K.int_shape(attn_gate)
 
         if input_shape[0]:
             # batch size matters, use rnn-based implementation
@@ -227,13 +224,11 @@ class SoftAttnGRU(Layer):
                                   inputs=inputs,
                                   constants=[],
                                   attention=attn_gate,
-                                  initial_states=self.get_initial_state(inputs),
+                                  initial_states=initial_state,
                                   input_length=input_shape[1],
                                   unroll=False)
-            if self.return_sequences:
-                y = outputs
-            else:
-                y = last_output
+            y = outputs
+
         else:
             # No batch size specified, therefore the layer will be able
             # to process batches of any size.
@@ -245,16 +240,20 @@ class SoftAttnGRU(Layer):
             # transformation in self._input_map.
             input_uid = _object_list_uid(inputs)
             inputs = K.reshape(inputs, (-1,) + tuple(input_shape[2:]))
+            inputs = K.reshape(initial_state, (-1,) + tuple(input_shape[2:]))
+            attn = K.reshape(attn_gate, (-1,) + att_shape[2:])
+
             self._input_map[input_uid] = inputs
             # (num_samples * timesteps, ...)
-            y = self.step(inputs=inputs, states=K.zeros_like(inputs), attention = attn_gate)
-            if hasattr(self, '_uses_learning_phasemy heart is in panama'):
+            # TODO here
+            y, y_states = self.step(inputs=inputs, states=initial_state, attention = attn)
+            if hasattr(self, '_uses_learning_phase'):
                 uses_learning_phase = self._uses_learning_phase
-            # Shape: (num_samples, timesteps, ...)
-            output_shape = list(input_shape)
+            output_shape = input_shape
             output_shape[-1] = self.units
-
-            y = K.reshape(y, (-1, input_length) + tuple(output_shape[2:]))
+            output_shape = tuple(output_shape)
+            y = K.reshape(y, (-1, input_length) + output_shape[2:])
+            # Shape: (num_samples, timesteps, ...)
 
         # Apply activity regularizer if any:
 
@@ -265,13 +264,11 @@ class SoftAttnGRU(Layer):
 
         if uses_learning_phase:
             y._uses_learning_phase = True
-        if self.return_sequences:
 
-            timesteps = input_shape[1]
-            new_time_steps = list(y.get_shape())
-            new_time_steps[1] = timesteps
-            y.set_shape(new_time_steps)
-
+        timesteps = input_shape[1]
+        new_time_steps = list(y.get_shape())
+        new_time_steps[1] = timesteps
+        y.set_shape(new_time_steps)
         return y
 
 
@@ -472,7 +469,6 @@ class SoftAttnGRU(Layer):
                                                        tuple(states) +
                                                        tuple(constants),
                                                        current_attention)
-                    print("GOT HERE")
                     if getattr(output, '_uses_learning_phase', False):
                         global uses_learning_phase
                         uses_learning_phase = True

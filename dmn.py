@@ -45,10 +45,11 @@ class DynamicMemoryNetwork():
             epochs=10,
             l_rate=1e-3,
             l_decay=0,
-            save_criteria='train_loss'):
+            save_criteria='train_loss',
+            validation_split = 0.0):
 
 
-        opt = optimizers.Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-08, decay=0.0)
+        opt = optimizers.Adam(lr=0.1)
         self.model.compile(optimizer=opt, loss =self.loss, metrics=["accuracy"])
 
         checkpoint = keras.callbacks.ModelCheckpoint(self.model_folder,
@@ -59,12 +60,12 @@ class DynamicMemoryNetwork():
                                             mode='auto',
                                             period=1)
 
-        logger = keras.callbacks.CSVLogger(self.log_location, separator=',', append=False)
-
-        train_history = model.fit([x, xq], y,
+        logger = keras.callbacks.CSVLogger(os.path.join(self.log_folder, "log.log"), separator=',', append=False)
+        train_history = self.model.fit( x={ 'input_tensor':np.array(train_x),
+                                            'question_tensor':np.array(train_q)}, y=np.array(train_y),
             callbacks = [checkpoint, logger],
-            validation_split = 0.1,
             batch_size=batch_size,
+            validation_split=validation_split,
             epochs=epochs)
 
         return train_history
@@ -75,23 +76,28 @@ class DynamicMemoryNetwork():
                     batch_size=batch_size)
         return loss, acc
 
-    def build_inference_graph(self, raw_inputs, question, batch_size=None ):
+    def build_inference_graph(self, raw_inputs, question, units=256, batch_size=32, dropout=0.):
+        assert(batch_size is not None)#   raise InvalidArgumentError("You need to specify a batch size")
 
-        inputs_tensor = Input(batch_shape = [batch_size] + list(raw_inputs[0].shape))
 
-        question_tensor = Input(batch_shape = [batch_size] + list(question[0].shape))
+        inputs_tensor = Input(batch_shape= (batch_size,) +  raw_inputs[0].shape, name='input_tensor')
+        question_tensor = Input(batch_shape= (batch_size,) +  question[0].shape, name='question_tensor')
 
-        facts, question = InputModule( units=16,
-                                       dropout=0.0)([inputs_tensor, question_tensor])
+
+        facts, question = InputModule( units=units,
+                                       dropout=dropout,
+                                       batch_size=batch_size) ([inputs_tensor, question_tensor])
 
         memory = EpisodicMemoryModule(
-                                      units=16,
+                                      units=units,
+                                      batch_size=batch_size,
+                                      dropout=dropout,
                                       memory_type='RELU',
                                       memory_steps=self.max_seq)([facts, question])
 
-        answer = Dense(units=self.num_classes)(memory)
+        answer = Dense(units=self.num_classes, activation='softmax', batch_size=batch_size)(memory)
 
-        prediction = K.argmax(answer,1)
+        #prediction = K.argmax(answer,1)
         # TODO: train vs. use. Correct output.
 
         self.model = Model(inputs=[inputs_tensor, question_tensor], outputs=answer)

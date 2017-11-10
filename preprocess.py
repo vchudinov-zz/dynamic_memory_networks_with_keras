@@ -232,7 +232,7 @@ def get_tasks(babi_task_location):
 
     return tasks, list(task_labels)
 
-def load_dataset(path_to_set, embeddings_path, emb_dim, tokenizer_path=None ):
+def load_dataset(path_to_set, embeddings_path, emb_dim, tokenizer_path=None, max_seq=10 ):
     """
     Where it all comes together. Loads a babi dataset.
     Args:
@@ -246,7 +246,7 @@ def load_dataset(path_to_set, embeddings_path, emb_dim, tokenizer_path=None ):
     # It iterates TWICE over the dataset, but hey, its not a big dataset.
     # Determine max sequence length. Will be used for question length too
     # Should be fine unless sentences are too long. In that case TODO
-    max_seq = 10
+    max_seq = max_seq
     # Load the GloVe embeddings
     embeddings_index = load_embeddings_index(embeddings_path=embeddings_path)
 

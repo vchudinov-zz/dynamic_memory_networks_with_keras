@@ -7,7 +7,7 @@ from keras.engine import InputSpec
 
 class InputModule(Layer):
 
-    def __init__(self, units, dropout=0.0):
+    def __init__(self, units, dropout=0.0, batch_size=32):
         """
         Contains the input module for the DMN+
         The input module consists of a "diffusion layer" - a bidirectional GRU
@@ -26,7 +26,8 @@ class InputModule(Layer):
                         activation='tanh',
                         use_bias=True,
                         dropout = dropout,
-                        return_sequences=True
+                        return_sequences=True,
+                        batch_size=batch_size
                         )
 
         self.facts_gru = Bidirectional(gru_layer, merge_mode='sum')
@@ -35,13 +36,13 @@ class InputModule(Layer):
             # TODO: Does this make sense for both question and input? No.
             self.dropout = Dropout(rate=dropout)
 
-        self.question_gru = GRU(units=units, return_sequences=False)
+        self.question_gru = GRU(units=units, return_sequences=False,batch_size=batch_size)
         self.name = "Input_Module"
 
     def compute_output_shape(self, input_shape):
         """
         """
-        
+
         out_shape = list(input_shape[0])
         out_shape[-1] = self.units
         q_shape = list(input_shape[1])
