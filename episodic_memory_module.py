@@ -1,16 +1,13 @@
-from keras.layers import Bidirectional, Dense, Concatenate, Multiply, Subtract, TimeDistributed,Dropout
-from keras.engine.topology import Layer
-from keras.layers.recurrent import GRU
-from keras import backend as K
-import tensorflow as tf
-from keras.utils.generic_utils import has_arg
-from attention_cells import SoftAttnGRU
-from keras.engine import InputSpec
 
+import tensorflow as tf
+from keras import backend as K
+from keras.engine.topology import Layer
+from keras.layers import (Bidirectional, Dense, Dropout)
+from attention_cells import SoftAttnGRU
 
 class EpisodicMemoryModule(Layer):
 
-    def __init__(self, units, memory_steps, batch_size=32, dropout=0.0,  **kwargs):
+    def __init__(self, units, memory_steps, emb_dim=50, batch_size=32, dropout=0.0,  **kwargs):
         """
         The episodic memory consists of two nested networks + other details.
         The inner network is used to generate an episode, based on the incoming
@@ -24,14 +21,14 @@ class EpisodicMemoryModule(Layer):
         # TODO: Change units to EMB_DIM
         # TODO: Dropout
 
-        self.memory_steps = 3
+        self.memory_steps = memory_steps
         self.name = "episodic_memory_module"
         self._input_map = {}
         self.supports_masking = True
         self.units = units
 
         # attention net.
-        self.l_1 = Dense(units=50, batch_size=batch_size, activation = 'tanh')
+        self.l_1 = Dense(units=emb_dim, batch_size=batch_size, activation = 'tanh')
         self.l_2 = Dense(units=1, batch_size=batch_size, activation=None)
 
         # Episode net
@@ -45,8 +42,6 @@ class EpisodicMemoryModule(Layer):
 
     def compute_output_shape(self, input_shape):
 
-        out_shape = list(input_shape[0])
-        out_shape[-1] = self.units
         q_shape = list(input_shape[1])
         q_shape[-1] = self.units
         return tuple(q_shape)
@@ -81,8 +76,8 @@ class EpisodicMemoryModule(Layer):
             attentions = tf.transpose(tf.stack(attentions))
             attentions = tf.nn.softmax(attentions)
             attentions = tf.expand_dims(attentions, axis=-1)
-
-            episode = self.episode_GRU([facts, attentions])[:,-1] # Last state. Correct? Maybe not.
+            episode_inputs = K.concatenate([facts, attentions], axis=2)
+            episode = self.episode_GRU(episode_inputs)[:,-1] # Last state. Correct? Maybe not.
             memory = self.memory_net(K.concatenate([memory, episode, question], axis=1))
 
         return memory

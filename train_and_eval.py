@@ -17,14 +17,15 @@ x_train, q_train, y_train, l_train, classes_train = load_dataset( path_to_set=ba
                                                                   tokenizer_path=None,
                                                                   max_seq=7
                                                                   )
+
 output_memory_units = len(classes_train)
 dmn_net = DynamicMemoryNetwork( model_folder=model_folder,
                                 input_units=input_units,
                                 memory_units=episodic_memory_units,
-                                max_seq=7,
+                                max_seq=3,
                                 output_units=output_memory_units
                                 )
 
-dmn_net.build_inference_graph(x_train, q_train, batch_size=batch_size, dropout=0.1, units=96)
-dmn_net.fit(x_train, q_train, l_train, batch_size=batch_size, epochs=256)
+dmn_net.build_inference_graph(x_train, q_train, batch_size=batch_size, dropout=0.25, units=80)
+dmn_net.fit(x_train, q_train, l_train, batch_size=batch_size, epochs=1000)
 print("Model compiled")

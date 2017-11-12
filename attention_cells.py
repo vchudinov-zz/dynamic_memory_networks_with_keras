@@ -1,19 +1,10 @@
+from tensorflow.python.ops import array_ops
 from keras import backend as K
-import tensorflow as tf
 from keras import activations
 from keras import initializers
 from keras import regularizers
 from keras import constraints
-#from ..egine import Layer
-from keras.engine.topology import Layer, _object_list_uid, _to_list
-from keras.layers.recurrent import Recurrent
-from keras.engine import InputSpec
-import numpy as np
-from tensorflow.python.ops import tensor_array_ops
-from tensorflow.python.ops import control_flow_ops
-from tensorflow.python.ops import functional_ops
-
-from keras_rnn import RNN
+from keras.engine.topology import Layer
 
 
 class SoftAttnGRU(Layer):
@@ -23,7 +14,7 @@ class SoftAttnGRU(Layer):
                  activation='tanh',
                  recurrent_activation='hard_sigmoid',
                  use_bias=True,
-                 kernel_initializer='uniform',
+                 kernel_initializer='orthogonal',
                  recurrent_initializer='orthogonal',
                  bias_initializer='zeros',
                  kernel_regularizer=None,
@@ -67,11 +58,12 @@ class SoftAttnGRU(Layer):
         self.attn_gate = None
         self.states = [None]
         self._input_map = {}
+
         super(SoftAttnGRU, self).__init__(**kwargs)
 
     def compute_output_shape(self, input_shape):
 
-        out = list(input_shape[0])
+        out = list(input_shape)
         out[-1] = self.units
         if self.return_sequences:
             return out
@@ -80,7 +72,7 @@ class SoftAttnGRU(Layer):
 
     def build(self, input_shape):
 
-        input_dim = input_shape[0][-1]
+        input_dim = input_shape[-1] - 1
 
         self.kernel = self.add_weight(shape=(input_dim, self.units * 3),
                                       name='kernel',
@@ -123,13 +115,11 @@ class SoftAttnGRU(Layer):
             self.bias_h = None
         super(SoftAttnGRU, self).build(input_shape)
 
-    def step(self, inputs, states, attention, training=None):
+    def step(self, inputs, states, training=None):
             # Needs question as an input
-            x_i = inputs
+            x_i, attn_gate = array_ops.split(inputs,
+                        num_or_size_splits=[self.units,1], axis=1)
             h_tm1 = states[0]
-            # Last entry in states should be the attention gate.
-            attn_gate = attention
-            # Gate inputs
 
             # dropout matrices for input units
             dp_mask = self._dropout_mask
@@ -201,9 +191,8 @@ class SoftAttnGRU(Layer):
                     h._uses_learning_phase = True
             return h, [h]
 
-    def call(self, input_list, initial_state=None, return_last_state=True,mask=None, training=None):
-        inputs=input_list[0]
-        attn_gate = input_list[1]
+    def call(self, input_list, initial_state=None, return_last_state=True, mask=None, training=None):
+        inputs=input_list
 
         self._generate_dropout_mask(inputs, training=training)
         self._generate_recurrent_dropout_mask(inputs, training=training)
@@ -215,47 +204,14 @@ class SoftAttnGRU(Layer):
         initial_state = self.get_initial_state(inputs)
 
         input_shape = K.int_shape(inputs)
-        att_shape = K.int_shape(attn_gate)
-
-        if input_shape[0]:
-            # batch size matters, use rnn-based implementation
-
-            last_output, outputs, _ = self.rnn(self.step,
+        last_output, outputs, _ = K.rnn(self.step,
                                   inputs=inputs,
                                   constants=[],
-                                  attention=attn_gate,
                                   initial_states=initial_state,
                                   input_length=input_shape[1],
                                   unroll=False)
-            y = outputs
 
-        else:
-            # No batch size specified, therefore the layer will be able
-            # to process batches of any size.
-            # We can go with reshape-based implementation for performance.
-            input_length = input_shape[1]
-            if not input_length:
-                input_length = K.shape(inputs)[1]
-            # Shape: (num_samples * timesteps, ...). And track the
-            # transformation in self._input_map.
-            input_uid = _object_list_uid(inputs)
-            inputs = K.reshape(inputs, (-1,) + tuple(input_shape[2:]))
-            inputs = K.reshape(initial_state, (-1,) + tuple(input_shape[2:]))
-            attn = K.reshape(attn_gate, (-1,) + att_shape[2:])
-
-            self._input_map[input_uid] = inputs
-            # (num_samples * timesteps, ...)
-            # TODO here
-            y, y_states = self.step(inputs=inputs, states=initial_state, attention = attn)
-            if hasattr(self, '_uses_learning_phase'):
-                uses_learning_phase = self._uses_learning_phase
-            output_shape = input_shape
-            output_shape[-1] = self.units
-            output_shape = tuple(output_shape)
-            y = K.reshape(y, (-1, input_length) + output_shape[2:])
-            # Shape: (num_samples, timesteps, ...)
-
-        # Apply activity regularizer if any:
+        y = outputs
 
         if (hasattr(self, 'activity_regularizer') and
            self.activity_regularizer is not None):
@@ -271,11 +227,9 @@ class SoftAttnGRU(Layer):
         y.set_shape(new_time_steps)
         return y
 
-
-
     def _generate_dropout_mask(self, inputs, training=None):
         if 0 < self.dropout < 1:
-            ones = K.ones_like(K.squeeze(inputs[:, 0:1, :], axis=1))
+            ones = K.ones_like(K.squeeze(inputs[:, 0:1, :-1], axis=1))
 
             def dropped_inputs():
                 return K.dropout(ones, self.dropout)
@@ -307,6 +261,7 @@ class SoftAttnGRU(Layer):
     def get_initial_state(self, inputs):
         # build an all-zero tensor of shape (samples, output_dim)
         initial_state = K.zeros_like(inputs)  # (samples, timesteps, input_dim)
+        initial_state = initial_state[:,:,:-1]
         initial_state = K.sum(initial_state, axis=(1, 2))  # (samples,)
         initial_state = K.expand_dims(initial_state)  # (samples, 1)
         if hasattr(self.state_size, '__len__'):
@@ -314,217 +269,3 @@ class SoftAttnGRU(Layer):
                     for dim in self.state_size]
         else:
             return [K.tile(initial_state, [1, self.state_size])]
-
-    def rnn(self, step_function, inputs, initial_states, attention=None,
-        go_backwards=False, mask=None, constants=None,
-        unroll=False, input_length=None):
-
-        ndim = len(inputs.get_shape())
-        if ndim < 3:
-            raise ValueError('Input should be at least 3D.')
-
-        # Transpose to time-major, i.e.
-        # from (batch, time, ...) to (time, batch, ...)
-        axes = [1, 0] + list(range(2, ndim))
-        inputs = tf.transpose(inputs, (axes))
-        attention = tf.transpose(attention, (axes))
-
-        if mask is not None:
-            if mask.dtype != tf.bool:
-                mask = tf.cast(mask, tf.bool)
-            if len(mask.get_shape()) == ndim - 1:
-                mask = expand_dims(mask)
-            mask = tf.transpose(mask, axes)
-
-        if constants is None:
-            constants = []
-
-        global uses_learning_phase
-        uses_learning_phase = False
-
-        if unroll:
-            if not inputs.get_shape()[0]:
-                raise ValueError('Unrolling requires a '
-                                 'fixed number of timesteps.')
-            states = initial_states
-            successive_states = []
-            successive_outputs = []
-
-            input_list = tf.unstack(inputs)
-            attention_list = tf.unstack(attention)
-            if go_backwards:
-                input_list.reverse()
-
-            if mask is not None:
-                mask_list = tf.unstack(mask)
-                if go_backwards:
-                    mask_list.reverse()
-
-                for inp, mask_t, att in zip(input_list, mask_list, attention_list):
-                    output, new_states = step_function(inp, states, att)
-                    if getattr(output, '_uses_learning_phase', False):
-                        uses_learning_phase = True
-
-                    # tf.where needs its condition tensor
-                    # to be the same shape as its two
-                    # result tensors, but in our case
-                    # the condition (mask) tensor is
-                    # (nsamples, 1), and A and B are (nsamples, ndimensions).
-                    # So we need to
-                    # broadcast the mask to match the shape of A and B.
-                    # That's what the tile call does,
-                    # it just repeats the mask along its second dimension
-                    # n times.
-                    tiled_mask_t = tf.tile(mask_t,
-                                           tf.stack([1, tf.shape(output)[1]]))
-
-                    if not successive_outputs:
-                        prev_output = zeros_like(output)
-                    else:
-                        prev_output = successive_outputs[-1]
-
-                    output = tf.where(tiled_mask_t, output, prev_output)
-
-                    return_states = []
-                    for state, new_state in zip(states, new_states):
-                        # (see earlier comment for tile explanation)
-                        tiled_mask_t = tf.tile(mask_t,
-                                               tf.stack([1, tf.shape(new_state)[1]]))
-                        return_states.append(tf.where(tiled_mask_t,
-                                                      new_state,
-                                                      state))
-                    states = return_states
-                    successive_outputs.append(output)
-                    successive_states.append(states)
-                last_output = successive_outputs[-1]
-                new_states = successive_states[-1]
-                outputs = tf.stack(successive_outputs)
-            else:
-                for inp, att in zip(input_list, attention_list):
-                    output, states = step_function(inp, states + constants, att)
-                    if getattr(output, '_uses_learning_phase', False):
-                        uses_learning_phase = True
-                    successive_outputs.append(output)
-                    successive_states.append(states)
-                last_output = successive_outputs[-1]
-                new_states = successive_states[-1]
-                outputs = tf.stack(successive_outputs)
-
-        else:
-            if go_backwards:
-                inputs = reverse(inputs, 0)
-
-            states = tuple(initial_states)
-
-            time_steps = tf.shape(inputs)[0]
-            outputs, _ = step_function(inputs[0], initial_states, attention[0])
-            output_ta = tensor_array_ops.TensorArray(
-                dtype=outputs.dtype,
-                size=time_steps,
-                tensor_array_name='output_ta')
-            input_ta = tensor_array_ops.TensorArray(
-                dtype=inputs.dtype,
-                size=time_steps,
-                tensor_array_name='input_ta')
-            attention_ta = tensor_array_ops.TensorArray(
-                dtype=attention.dtype,
-                size=time_steps,
-                tensor_array_name='attention_ta')
-
-            input_ta = input_ta.unstack(inputs)
-            attention_ta = attention_ta.unstack(attention)
-            time = tf.constant(0, dtype='int32', name='time')
-
-            if mask is not None:
-                if not states:
-                    raise ValueError('No initial states provided! '
-                                     'When using masking in an RNN, you should '
-                                     'provide initial states '
-                                     '(and your step function should return '
-                                     'as its first state at time `t` '
-                                     'the output at time `t-1`).')
-                if go_backwards:
-                    mask = reverse(mask, 0)
-
-                mask_ta = tensor_array_ops.TensorArray(
-                    dtype=tf.bool,
-                    size=time_steps,
-                    tensor_array_name='mask_ta')
-                mask_ta = mask_ta.unstack(mask)
-
-                def _step(time, output_ta_t, attention, *states):
-                    """RNN step function.
-                    # Arguments
-                        time: Current timestep value.
-                        output_ta_t: TensorArray.
-                        *states: List of states.
-                    # Returns
-                        Tuple: `(time + 1,output_ta_t) + tuple(new_states)`
-                    """
-                    current_input = input_ta.read(time)
-
-                    current_attention = attention_ta.read(time)
-                    mask_t = mask_ta.read(time)
-                    output, new_states = step_function(current_input,
-                                                       tuple(states) +
-                                                       tuple(constants),
-                                                       current_attention)
-                    if getattr(output, '_uses_learning_phase', False):
-                        global uses_learning_phase
-                        uses_learning_phase = True
-                    for state, new_state in zip(states, new_states):
-                        new_state.set_shape(state.get_shape())
-                    tiled_mask_t = tf.tile(mask_t,
-                                           tf.stack([1, tf.shape(output)[1]]))
-                    output = tf.where(tiled_mask_t, output, states[0])
-                    new_states = [tf.where(tiled_mask_t, new_states[i], states[i]) for i in range(len(states))]
-                    output_ta_t = output_ta_t.write(time, output)
-
-                    return (time + 1, output_ta_t) + tuple(new_states)
-            else:
-                def _step(time, output_ta_t, *states):
-                    """RNN step function.
-                    # Arguments
-                        time: Current timestep value.
-                        output_ta_t: TensorArray.
-                        *states: List of states.
-                    # Returns
-                        Tuple: `(time + 1,output_ta_t) + tuple(new_states)`
-                    """
-                    current_input = input_ta.read(time)
-                    current_attention = attention_ta.read(time)
-                    output, new_states = step_function(current_input,
-                                                       tuple(states) +
-                                                       tuple(constants),
-                                                       current_attention)
-
-                    if getattr(output, '_uses_learning_phase', False):
-                        global uses_learning_phase
-                        uses_learning_phase = True
-                    for state, new_state in zip(states, new_states):
-                        new_state.set_shape(state.get_shape())
-                    output_ta_t = output_ta_t.write(time, output)
-                    #print("GOt Here")
-
-                    return (time + 1, output_ta_t) + tuple(new_states)
-
-
-            final_outputs = control_flow_ops.while_loop(
-                cond=lambda time, *_: time < time_steps,
-                body=_step,
-                loop_vars=(time, output_ta) + states,
-                parallel_iterations=32,
-                swap_memory=True)
-
-            last_time = final_outputs[0]
-            output_ta = final_outputs[1]
-            new_states = final_outputs[2:]
-
-            outputs = output_ta.stack()
-            last_output = output_ta.read(last_time - 1)
-
-        axes = [1, 0] + list(range(2, len(outputs.get_shape())))
-        outputs = tf.transpose(outputs, axes)
-        last_output._uses_learning_phase = uses_learning_phase
-
-        return last_output, outputs, new_states

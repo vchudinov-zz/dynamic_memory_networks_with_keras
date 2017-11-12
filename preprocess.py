@@ -1,6 +1,5 @@
 import pickle
 import numpy as np
-
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 
@@ -277,7 +276,7 @@ def load_dataset(path_to_set, embeddings_path, emb_dim, tokenizer_path=None, max
 
     xq = [x['Q'] for x in tasks]
     word_y = [x['A'] for x in tasks] # word_y_i is the embedding for the answer for the task
-    one_hot_y = [ list(x['L']).index(1) for x in tasks] # one_hot_y_i is the corresponding one_hot answer
+    one_hot_y = [ x['L'] for x in tasks] # one_hot_y_i is the corresponding one_hot answer
 
 
     return x, xq, word_y, one_hot_y, task_labels
