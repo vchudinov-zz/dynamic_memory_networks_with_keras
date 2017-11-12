@@ -35,6 +35,7 @@ class InputModule(Layer):
         if dropout >= 0:
             # TODO: Does this make sense for both question and input? No.
             self.dropout = Dropout(rate=dropout)
+            self.dropout_1 = Dropout(rate=dropout)
 
         self.question_gru = GRU(units=units, return_sequences=False,batch_size=batch_size)
         self.name = "Input_Module"
@@ -67,8 +68,8 @@ class InputModule(Layer):
         question_vector = self.question_gru(question)
 
         if self.dropout is not None:
-            fact_vectors = self.dropout.call(fact_vectors)
-            question_vector = self.dropout.call(question_vector)
+            fact_vectors = self.dropout(fact_vectors)
+            question_vector = self.dropout_1(question_vector)
 
         shapes = self.compute_output_shape([inputs.get_shape(),question.get_shape()])
         fact_vectors.set_shape(shapes[0])

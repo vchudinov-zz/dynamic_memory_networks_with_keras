@@ -32,7 +32,7 @@ class DynamicMemoryNetwork():
         self.memory_type = memory_type
         self.log_folder = os.path.join(model_folder, "log")
         self.num_classes = output_units
-        self.loss = "categorical_crossentropy"
+        self.loss = "sparse_categorical_crossentropy"
         if not os.path.exists(self.log_folder):
             os.makedirs(self.log_folder)
 
@@ -49,21 +49,22 @@ class DynamicMemoryNetwork():
             validation_split = 0.0):
 
 
-        opt = optimizers.Adam(lr=0.1)
-        self.model.compile(optimizer=opt, loss =self.loss, metrics=["accuracy"])
-
-        checkpoint = keras.callbacks.ModelCheckpoint(self.model_folder,
-                                            monitor=save_criteria,
-                                            verbose=0,
+        opt = optimizers.Adam(lr=0.001)
+        checkpoint = keras.callbacks.ModelCheckpoint(os.path.join(self.model_folder, "dmn"),
+                                            monitor='sparse_categorical_accuracy',
+                                            verbose=1,
                                             save_best_only=True,
                                             save_weights_only=False,
-                                            mode='auto',
+                                            mode='max',
                                             period=1)
 
         logger = keras.callbacks.CSVLogger(os.path.join(self.log_folder, "log.log"), separator=',', append=False)
+        self.model.compile(optimizer=opt, loss =self.loss, metrics=["sparse_categorical_accuracy"])
+
+
         train_history = self.model.fit( x={ 'input_tensor':np.array(train_x),
                                             'question_tensor':np.array(train_q)}, y=np.array(train_y),
-            callbacks = [checkpoint, logger],
+            callbacks = [logger, checkpoint],
             batch_size=batch_size,
             validation_split=validation_split,
             epochs=epochs)
@@ -86,7 +87,7 @@ class DynamicMemoryNetwork():
 
         facts, question = InputModule( units=units,
                                        dropout=dropout,
-                                       batch_size=batch_size) ([inputs_tensor, question_tensor])
+                                       batch_size=batch_size)([inputs_tensor, question_tensor])
 
         memory = EpisodicMemoryModule(
                                       units=units,
@@ -95,7 +96,7 @@ class DynamicMemoryNetwork():
                                       memory_type='RELU',
                                       memory_steps=self.max_seq)([facts, question])
 
-        answer = Dense(units=self.num_classes, activation='softmax', batch_size=batch_size)(memory)
+        answer = Dense(units=self.num_classes, batch_size=batch_size)(memory)
 
         #prediction = K.argmax(answer,1)
         # TODO: train vs. use. Correct output.

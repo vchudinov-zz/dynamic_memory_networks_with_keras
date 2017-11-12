@@ -145,12 +145,10 @@ def embed_sentences(sentences, tokenizer, emb_matrix, max_seq=None, positional_e
     if max_seq is not None:
         sentences = pad_sequences(sentences, max_seq)
     sentences = [np.array(embed_sentence(sentence=s, emb_matrix=emb_matrix)) for s in sentences]
-
     if positional_encoding is not None:
         # to get sentence representation
         sentences = np.sum(np.array(sentences)*positional_encoding, axis=2)
 
-        # TODO axis - not sure about it.
     return np.array(sentences)
 
 # Taken from https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow
@@ -279,7 +277,7 @@ def load_dataset(path_to_set, embeddings_path, emb_dim, tokenizer_path=None, max
 
     xq = [x['Q'] for x in tasks]
     word_y = [x['A'] for x in tasks] # word_y_i is the embedding for the answer for the task
-    one_hot_y = [x['L'] for x in tasks] # one_hot_y_i is the corresponding one_hot answer
+    one_hot_y = [ list(x['L']).index(1) for x in tasks] # one_hot_y_i is the corresponding one_hot answer
 
 
     return x, xq, word_y, one_hot_y, task_labels
