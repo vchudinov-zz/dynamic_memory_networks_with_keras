@@ -14,7 +14,7 @@ class SoftAttnGRU(Layer):
                  activation='tanh',
                  recurrent_activation='hard_sigmoid',
                  use_bias=True,
-                 kernel_initializer='orthogonal',
+                 kernel_initializer='glorot_uniform',
                  recurrent_initializer='orthogonal',
                  bias_initializer='zeros',
                  kernel_regularizer=None,
@@ -55,8 +55,7 @@ class SoftAttnGRU(Layer):
         self.state_size = self.units
         self._dropout_mask = None
         self._recurrent_dropout_mask = None
-        self.attn_gate = None
-        self.states = [None]
+
         self._input_map = {}
 
         super(SoftAttnGRU, self).__init__(**kwargs)
@@ -191,7 +190,7 @@ class SoftAttnGRU(Layer):
                     h._uses_learning_phase = True
             return h, [h]
 
-    def call(self, input_list, initial_state=None, return_last_state=True, mask=None, training=None):
+    def call(self, input_list, initial_state=None, mask=None, training=None):
         inputs=input_list
 
         self._generate_dropout_mask(inputs, training=training)
@@ -210,8 +209,10 @@ class SoftAttnGRU(Layer):
                                   initial_states=initial_state,
                                   input_length=input_shape[1],
                                   unroll=False)
-
-        y = outputs
+        if self.return_sequences:
+            y = outputs
+        else:
+            y = last_output
 
         if (hasattr(self, 'activity_regularizer') and
            self.activity_regularizer is not None):
@@ -221,10 +222,11 @@ class SoftAttnGRU(Layer):
         if uses_learning_phase:
             y._uses_learning_phase = True
 
-        timesteps = input_shape[1]
-        new_time_steps = list(y.get_shape())
-        new_time_steps[1] = timesteps
-        y.set_shape(new_time_steps)
+        if self.return_sequences:
+            timesteps = input_shape[1]
+            new_time_steps = list(y.get_shape())
+            new_time_steps[1] = timesteps
+            y.set_shape(new_time_steps)
         return y
 
     def _generate_dropout_mask(self, inputs, training=None):

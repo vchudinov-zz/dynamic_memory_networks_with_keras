@@ -34,7 +34,7 @@ class EpisodicMemoryModule(Layer):
         # Episode net
         self.episode_GRU = SoftAttnGRU(units=units, return_sequences=False, batch_size=batch_size, dropout=dropout)
 
-        # Memory generating net. TODO Check output size.
+        # Memory generating net.
         self.memory_net = Dense(units=units, activation='relu')
 
         super(EpisodicMemoryModule, self).__init__()
@@ -57,12 +57,10 @@ class EpisodicMemoryModule(Layer):
             f_i = [fact * question, fact * memory, K.abs(fact - question), K.abs(fact - memory)]
             g_t_i = self.l_1(K.concatenate(f_i))
             g_t_i = self.l_2(g_t_i)
-
             return g_t_i
 
         facts = inputs[0]
         question = inputs[1]
-
         memory = K.identity(question)   # Initialize memory to the question
 
         for step in range(self.memory_steps):
@@ -76,8 +74,8 @@ class EpisodicMemoryModule(Layer):
             attentions = tf.transpose(tf.stack(attentions))
             attentions = tf.nn.softmax(attentions)
             attentions = tf.expand_dims(attentions, axis=-1)
-            episode_inputs = K.concatenate([facts, attentions], axis=2)
-            episode = self.episode_GRU(episode_inputs)[:,-1] # Last state. Correct? Maybe not.
-            memory = self.memory_net(K.concatenate([memory, episode, question], axis=1))
 
+            episode = K.concatenate([facts, attentions], axis=2)
+            episode = self.episode_GRU(episode) # Last state. Correct? Maybe not
+            memory = self.memory_net(K.concatenate([memory, episode, question], axis=1))
         return memory

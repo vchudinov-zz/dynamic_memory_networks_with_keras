@@ -74,12 +74,10 @@ class DynamicMemoryNetwork():
         return loss, acc
 
     def build_inference_graph(self, raw_inputs, question, units=256, batch_size=32, dropout=0.):
-        assert(batch_size is not None)#   raise InvalidArgumentError("You need to specify a batch size")
-
+        assert(batch_size is not None)
 
         inputs_tensor = Input(batch_shape= (batch_size,) +  raw_inputs[0].shape, name='input_tensor')
         question_tensor = Input(batch_shape= (batch_size,) +  question[0].shape, name='question_tensor')
-
 
         facts, question = InputModule( units=units,
                                        dropout=dropout,
@@ -90,8 +88,9 @@ class DynamicMemoryNetwork():
                                       batch_size=batch_size,
                                       dropout=dropout,
                                       memory_type='RELU',
+                                      emb_dim=100
                                       memory_steps=self.max_seq)([facts, question])
-        
+
         answer = Concatenate(axis=1)([memory, question])
         answer = Dense(units=self.num_classes, batch_size=batch_size, activation="softmax")(answer)
 

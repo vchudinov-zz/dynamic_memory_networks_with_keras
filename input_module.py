@@ -23,6 +23,7 @@ class InputModule(Layer):
         gru_layer = GRU(units=units,
                         dropout = dropout,
                         return_sequences=True,
+                        stateful=True,
                         batch_size=batch_size
                         )
 
@@ -31,7 +32,7 @@ class InputModule(Layer):
         if dropout >= 0:
             # TODO: Does this make sense for both question and input? No.
             self.dropout = Dropout(rate=dropout)
-        self.question_gru = GRU(units=units, return_sequences=False,batch_size=batch_size)
+        self.question_gru = GRU(units=units, stateful=True, return_sequences=False, batch_size=batch_size)
         self.name = "Input_Module"
 
     def compute_output_shape(self, input_shape):
@@ -65,7 +66,7 @@ class InputModule(Layer):
             fact_vectors = self.dropout(fact_vectors)
             #question_vector = self.dropout(question_vector)
 
-        shapes = self.compute_output_shape([inputs.get_shape(),question.get_shape()])
+        shapes = self.compute_output_shape([inputs.get_shape(), question.get_shape()])
         fact_vectors.set_shape(shapes[0])
         question_vector.set_shape(shapes[1])
 
