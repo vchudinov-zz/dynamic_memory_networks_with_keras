@@ -120,6 +120,25 @@ def get_stories(f, only_supporting=False, max_length=None):
 
 
 def vectorize_stories(data, word_idx, story_maxlen, query_maxlen):
+    """Short summary.
+
+    Parameters
+    ----------
+    data : type
+        Description of parameter `data`.
+    word_idx : type
+        Description of parameter `word_idx`.
+    story_maxlen : type
+        Description of parameter `story_maxlen`.
+    query_maxlen : type
+        Description of parameter `query_maxlen`.
+
+    Returns
+    -------
+    type
+        Description of returned object.
+
+    """
     xs = []
     xqs = []
     ys = []
@@ -140,10 +159,15 @@ def vectorize_stories(data, word_idx, story_maxlen, query_maxlen):
 
 
 def load_dataset(babi_location, emb_location):
+    # TODO: Add progress bar
+    print("----- Loading Embeddings.-----")
+    word_index = load_embeddings_index(emb_location)
+    print("----- Retrieving Stories. -----")
     stories = get_stories(open(babi_location, 'r'))
     story_maxlen = max(map(len, (x for x, _, _ in stories)))
     query_maxlen = max(map(len, (x for _, x, _ in stories)))
-    word_index = load_embeddings_index(emb_location)
+
+    print("----- Vectorizing Stories -----")
     vectorized_stories = vectorize_stories(
         stories, word_index, story_maxlen, query_maxlen)
 
