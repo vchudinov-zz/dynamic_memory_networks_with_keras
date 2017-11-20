@@ -3,6 +3,11 @@ from functools import reduce
 import numpy as np
 from keras.preprocessing.sequence import pad_sequences
 
+"""
+Adapted from https://github.com/fchollet/keras/blob/master/examples/babi_rnn.py
+"""
+
+
 def get_positional_encoding(max_seq, emb_dim):
     """
     Generates  a positional encoding as described in section
@@ -17,13 +22,14 @@ def get_positional_encoding(max_seq, emb_dim):
     """
 
     encoding = np.ones((emb_dim, max_seq), dtype=np.float32)
-    ls = max_seq+1
-    le = emb_dim+1
+    ls = max_seq + 1
+    le = emb_dim + 1
     for i in range(1, le):
         for j in range(1, ls):
-            encoding[i-1, j-1] = (i - (le-1)/2) * (j - (ls-1)/2)
+            encoding[i - 1, j - 1] = (i - (le - 1) / 2) * (j - (ls - 1) / 2)
     encoding = 1 + 4 * encoding / emb_dim / max_seq
     return np.transpose(encoding)
+
 
 def load_embeddings_index(embeddings_path):
     """
@@ -49,14 +55,15 @@ def load_embeddings_index(embeddings_path):
     embeddings_index["<eos>"] = np.random.rand(100)
     return embeddings_index
 
+
 def tokenize(sent):
     '''Return the tokens of a sentence including punctuation.
     >>> tokenize('Bob dropped the apple. Where is the apple?')
     ['Bob', 'dropped', 'the', 'apple', '.', 'Where', 'is', 'the', 'apple', '?']
     '''
     s = [x.strip() for x in re.split('(\W+)?', sent) if x.strip()]
-    s = [x if x !="." else "<eos>" for x in s]
-    s = [x.lower() for x in s if x !="?"]
+    s = [x if x != "." else "<eos>" for x in s]
+    s = [x.lower() for x in s if x != "?"]
     return s
 
 
@@ -99,8 +106,15 @@ def get_stories(f, only_supporting=False, max_length=None):
     any stories longer than max_length tokens will be discarded.
     '''
     data = parse_stories(f.readlines(), only_supporting=only_supporting)
-    flatten = lambda data: reduce(lambda x, y: x + y, data)
-    data = [(flatten(story), q, answer) for story, q, answer in data if not max_length or len(flatten(story)) < max_length]
+
+    def flatten(data): return reduce(lambda x, y: x + y, data)
+    data = [
+        (flatten(story),
+         q,
+         answer) for story,
+        q,
+        answer in data if not max_length or len(
+            flatten(story)) < max_length]
 
     return data
 
@@ -121,14 +135,16 @@ def vectorize_stories(data, word_idx, story_maxlen, query_maxlen):
         xqs.append(xq)
         ys.append(y)
     xs = pad_sequences(xs, maxlen=story_maxlen)
-    xs = [x*positional_encoding for x in xs]
+    xs = [x * positional_encoding for x in xs]
     return np.array(xs), pad_sequences(xqs, maxlen=query_maxlen), np.array(ys)
+
 
 def load_dataset(babi_location, emb_location):
     stories = get_stories(open(babi_location, 'r'))
     story_maxlen = max(map(len, (x for x, _, _ in stories)))
     query_maxlen = max(map(len, (x for _, x, _ in stories)))
     word_index = load_embeddings_index(emb_location)
-    vectorized_stories = vectorize_stories(stories, word_index, story_maxlen, query_maxlen)
+    vectorized_stories = vectorize_stories(
+        stories, word_index, story_maxlen, query_maxlen)
 
     return vectorized_stories[0], vectorized_stories[1], vectorized_stories[2], story_maxlen
