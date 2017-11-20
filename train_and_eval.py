@@ -13,7 +13,7 @@ validation_split = 0.15
 input_shape = x_train[0].shape
 question_shape = q_train[0].shape
 num_classes = len(y_train[0])
-units = 256
+units = 100
 emb_dim = 100
 memory_steps = 3
 dropout = 0.3
@@ -27,15 +27,14 @@ dmn_net.build_inference_graph(
     question_shape=question_shape,
     num_classes=num_classes,
     units=units,
-    emb_dim=emb_dim,
     batch_size=batch_size,
     memory_steps=memory_steps,
     dropout=dropout)
 
 print("------ Model Compiled. Training -------")
-dmn_net.fit(x_train, q_train, y_train, batch_size=32,
+dmn_net.fit(x_train, q_train, y_train,
             epochs=epochs,
-            validation_split=0.15,
+            validation_split=validation_split,
             l_rate=1e-3,
             l_decay=0,)
 print("----- Model Trained. -----")

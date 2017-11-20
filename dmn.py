@@ -45,52 +45,48 @@ class DynamicMemoryNetwork():
             train_x,
             train_q,
             train_y,
-            batch_size=32,
-            epochs=10,
+            epochs=256,
             validation_split=0.15,
             l_rate=1e-3,
             l_decay=0,
-            loss="categorical_crossentropy"
-            save_criteria='val_loss'
+            save_criteria='val_loss',
+            save_criteria_mode='min'
             ):
-        """Short summary.
+        """
+        Trains the DMN model. Will save the model based on save_criteria and mode.
 
         Parameters
         ----------
-        train_x : type
-            Description of parameter `train_x`.
-        train_q : type
-            Description of parameter `train_q`.
-        train_y : type
-            Description of parameter `train_y`.
-        batch_size : type
-            Description of parameter `batch_size`.
-        epochs : type
-            Description of parameter `epochs`.
-        l_rate : type
-            Description of parameter `l_rate`.
-        l_decay : type
-            Description of parameter `l_decay`.
-        loss : type
-            Description of parameter `loss`.
-        validation_split : type
-            Description of parameter `validation_split`.
+        train_x : (np.array)
+            np.array containing the input examples. Each example should have dimensions (time_steps, emb_size)
+        train_q : (np.array)
+            np.array containing the question examples. Each example should have dimensions (time_steps, emb_size)
+        train_y : (np.array)
+            An array holding the labels for each example. Each label must be a one-hot-vector with length (num_classes)
+        epochs : (int)
+            Number of epochs to train
+        l_rate : (float)
+            Learning rate
+        l_decay : (float)
+            The decay that will be applied to the learning rate
+        validation_split : (float)
+            Proportion of the dataset to reserve for validation. If left at 0 the
+            entire set will be used for training
 
         Returns
         -------
-        type
-            Description of returned object.
+        (keras.callbacks)
+            The training history as a keras callback object.
 
         """
 
         opt = optimizers.Adam(lr=l_rate, decay=l_decay)
-        #labels =  to_categorical(np.array(train_y), num_classes=None)
         checkpoint = keras.callbacks.ModelCheckpoint(self.model_path,
-                                                     monitor='categorical_accuracy',
+                                                     monitor=save_criteria,
                                                      verbose=1,
                                                      save_best_only=True,
                                                      save_weights_only=False,
-                                                     mode='max',
+                                                     mode=save_criteria_mode,
                                                      period=1)
 
         logger = keras.callbacks.CSVLogger(
@@ -102,55 +98,81 @@ class DynamicMemoryNetwork():
 
         self.model.compile(
             optimizer=opt,
-            loss=loss,
+            loss="categorical_crossentropy",
             metrics=["categorical_accuracy"])
+
         train_history = self.model.fit(x={'input_tensor': train_x,
                                           'question_tensor': train_q},
                                        y=train_y,
                                        callbacks=[logger, checkpoint],
-                                       batch_size=batch_size,
+                                       batch_size=self.batch_size,
                                        validation_split=validation_split,
                                        epochs=epochs)
 
         return train_history
 
     def validate_model(self, x_val, xq_val, y_val):
-        loss, acc = model.evaluate([x, xq], y,
-                                   batch_size=batch_size)
-        return loss, acc
-
-    def build_inference_graph(self, input_shape, question_shape, num_classes,
-                              units=256, emb_dim=100, batch_size=32, memory_steps=3, dropout=0.):
-        """Short summary.
+        """
+        Validates a model on supplied validation set.
 
         Parameters
         ----------
-        input_shape : type
-            Description of parameter `input_shape`.
-        question_shape : type
-            Description of parameter `question_shape`.
-        num_classes : type
-            Description of parameter `num_classes`.
-        units : type
-            Description of parameter `units`.
-        emb_dim : type
-            Description of parameter `emb_dim`.
-        batch_size : type
-            Description of parameter `batch_size`.
-        memory_steps : type
-            Description of parameter `memory_steps`.
-        dropout : type
-            Description of parameter `dropout`.
+        x_val : (np.array)
+            np.array containing the input examples. Each example should have dimensions (time_steps, emb_size)
+        xq_val : (np.array)
+            np.array containing the question examples. Each example should have dimensions (time_steps, emb_size)
+        y_val : (np.array)
+            An array holding the labels for each example. Each label must be a one-hot-vector with length (num_classes)
 
         Returns
         -------
-        type
-            Description of returned object.
+        (float)
+            Validation loss
+        (float)
+            Validation set accuracy
+        """
 
+        loss, acc = model.evaluate([x_val, xq_val], y_val,
+                                   batch_size=self.batch_size)
+        return loss, acc
+
+    def load(self, model_path):
+        raise NotImplementedError
+
+    def predict(self, x, xq, batch_size=1):
+        return self.model.predict([x, xq], batch_size=batch_size)
+
+    def build_inference_graph(self, input_shape, question_shape, num_classes,
+                              units=256,batch_size=32, memory_steps=3, dropout=0.):
+        """Builds the model.
+
+        Parameters
+        ----------
+        input_shape : (tuple) or (list)
+            A tuple or list specifying the shape of an individual input example
+            Excludes batch size
+        question_shape : (tuple) or (list)
+            A tuple or list specifying the shape of an individual question example.
+            Excludes batch size
+        num_classes : (int)
+            The number of possible output classes
+        units : (int)
+            Number of hidden units. Used for all layers
+        batch_size : (int)
+            Batch Size.
+        memory_steps : (int)
+            Number of steps to take when generating new memories
+        dropout : (float)
+            The dropout rate for the model.
+
+        Returns
+        -------
+        None
         """
 
         assert(batch_size is not None)
-
+        emb_dim = input_shape[-1]
+        self.batch_size = batch_size
         inputs_tensor = Input(
             batch_shape=(
                 batch_size,
@@ -186,9 +208,9 @@ class DynamicMemoryNetwork():
 
         answer = EpisodicMemoryModule(
             units=units,
-            batch_size=batch_size
+            batch_size=batch_size,
             emb_dim=emb_dim,
-            memory_steps=mem_hops)([facts, question])
+            memory_steps=memory_steps)([facts, question])
 
         answer = Dropout(dropout)(answer)
         answer = Dense(
