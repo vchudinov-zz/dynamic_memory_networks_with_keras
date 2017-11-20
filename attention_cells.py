@@ -6,6 +6,7 @@ from keras import regularizers
 from keras import constraints
 from keras.engine.topology import Layer
 
+from keras import regularizers
 
 class SoftAttnGRU(Layer):
 
