@@ -31,7 +31,7 @@ def get_positional_encoding(max_seq, emb_dim):
     return np.transpose(encoding)
 
 
-def load_embeddings_index(embeddings_path):
+def load_embeddings_index(embeddings_path, emb_dim=None):
     """
     Takne from the Keras blog.
     Loads a  pre-trained embeddings matrix,
@@ -49,10 +49,14 @@ def load_embeddings_index(embeddings_path):
     for line in f:
         values = line.split()
         word = values[0]
-        coefs = np.asarray(values[1:], dtype='float32')
+        if emb_dim is not None:
+            coefs = values[1:emb_dim+1]
+        else:
+            coefs = values[1:]
+        coefs = np.asarray(coefs, dtype='float32')
         embeddings_index[word] = coefs
     f.close()
-    embeddings_index["<eos>"] = np.random.rand(100)
+    embeddings_index["<eos>"] = np.random.rand(len(coefs))
     return embeddings_index
 
 
@@ -120,30 +124,11 @@ def get_stories(f, only_supporting=False, max_length=None):
 
 
 def vectorize_stories(data, word_idx, story_maxlen, query_maxlen):
-    """Short summary.
-
-    Parameters
-    ----------
-    data : type
-        Description of parameter `data`.
-    word_idx : type
-        Description of parameter `word_idx`.
-    story_maxlen : type
-        Description of parameter `story_maxlen`.
-    query_maxlen : type
-        Description of parameter `query_maxlen`.
-
-    Returns
-    -------
-    type
-        Description of returned object.
-
-    """
     xs = []
     xqs = []
     ys = []
     task_labels = sorted(list(set([x for _, _, x in data])))
-    positional_encoding = get_positional_encoding(story_maxlen, 100)
+    positional_encoding = get_positional_encoding(story_maxlen, len(word_idx["<eos>"]))
 
     for story, query, answer in data:
         x = [word_idx[w] for w in story]
@@ -158,17 +143,27 @@ def vectorize_stories(data, word_idx, story_maxlen, query_maxlen):
     return np.array(xs), pad_sequences(xqs, maxlen=query_maxlen), np.array(ys)
 
 
-def load_dataset(babi_location, emb_location):
-    # TODO: Add progress bar
+def load_dataset( emb_location, babi_location, babi_test_location=None, emb_dim=None):
+    # TODO I forgot
     print("----- Loading Embeddings.-----")
-    word_index = load_embeddings_index(emb_location)
+    word_index = load_embeddings_index(emb_location, emb_dim)
     print("----- Retrieving Stories. -----")
     stories = get_stories(open(babi_location, 'r'))
     story_maxlen = max(map(len, (x for x, _, _ in stories)))
     query_maxlen = max(map(len, (x for _, x, _ in stories)))
 
-    print("----- Vectorizing Stories -----")
+
+    if babi_test_location is not None:
+        test_stories = get_stories(open(babi_test_location, 'r'))
+        test_story_maxlen = max(map(len, (x for x, _, _ in test_stories)))
+        test_query_maxlen = max(map(len, (x for _, x, _ in test_stories)))
+        story_maxlen = max(story_maxlen, test_story_maxlen)
+        query_maxlen = max(query_maxlen, test_query_maxlen)
+        vectorized_test = vectorize_stories(test_stories, word_index, story_maxlen, query_maxlen)
+
     vectorized_stories = vectorize_stories(
         stories, word_index, story_maxlen, query_maxlen)
+    if babi_test_location is not None:
+        return vectorized_stories, vectorized_test, story_maxlen
 
-    return vectorized_stories[0], vectorized_stories[1], vectorized_stories[2], story_maxlen
+    return vectorized_stories, story_maxlen

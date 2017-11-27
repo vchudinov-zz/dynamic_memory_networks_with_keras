@@ -11,7 +11,7 @@ from keras import regularizers
 class EpisodicMemoryModule(Layer):
 
     def __init__(self, units, memory_steps, emb_dim,
-                 batch_size, dropout=0.0, **kwargs):
+                 batch_size, dropout=0.0, reuglarization=1e-3, **kwargs):
         """Short summary.
 
         Parameters
@@ -49,32 +49,36 @@ class EpisodicMemoryModule(Layer):
         self.l_1 = Dense(units=emb_dim,
                          batch_size=batch_size,
                          activation='tanh',
-                         kernel_regularizer=regularizers.l2(0.01))
+                         kernel_regularizer=regularizers.l2(reuglarization))
 
         self.l_2 = Dense(units=1,
                          batch_size=batch_size,
                          activation=None,
-                         kernel_regularizer=regularizers.l2(0.01))
+                         kernel_regularizer=regularizers.l2(reuglarization))
 
         # Episode net
         self.episode_GRU = SoftAttnGRU(units=units,
                                        return_sequences=False,
                                        batch_size=batch_size,
                                        kernel_regularizer=regularizers.l2(
-                                           0.01),
-                                       recurrent_regularizer=regularizers.l2(0.01))
+                                           0.001),
+                                       recurrent_regularizer=regularizers.l2(reuglarization))
 
         # Memory generating net.
         self.memory_net = Dense(units=units,
                                 activation='relu',
-                                kernel_regularizer=regularizers.l2(0.01))
+                                kernel_regularizer=regularizers.l2(reuglarization))
 
         super(EpisodicMemoryModule, self).__init__()
+
+    def get_config():
+        raise NotImplementedError
 
     def compute_output_shape(self, input_shape):
 
         q_shape = list(input_shape[1])
         q_shape[-1] = self.units * 2
+        
         return tuple(q_shape)
 
     def build(self, input_shape):

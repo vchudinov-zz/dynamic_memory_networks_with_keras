@@ -194,6 +194,7 @@ class SoftAttnGRU(Layer):
         return h, [h]
 
     def call(self, input_list, initial_state=None, mask=None, training=None):
+        
         inputs = input_list
 
         self._generate_dropout_mask(inputs, training=training)
