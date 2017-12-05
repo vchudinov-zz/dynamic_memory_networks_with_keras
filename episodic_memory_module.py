@@ -1,100 +1,157 @@
-from keras.layers import Bidirectional, Dense
-from keras.layers.recurrent import GRU
+
+import tensorflow as tf
+from keras import backend as K
+from keras.engine.topology import Layer
+from keras.layers import (Bidirectional, Dense)
+from attention_cells import SoftAttnGRU
+
+from keras import regularizers
+
 
 class EpisodicMemoryModule(Layer):
-    def __init__(self,attn_units, attention_type, memory_units, memory_type, memory_steps, output_dim, **kwargs):
-        """
-        The episodic memory consists of two nested networks + other details.
-        The inner network is used to generate an episode, based on the incoming
-        facts F_t that are sent from the input module.
-        The outer network applies the attention to the facts to update the memory
-        with the new episodes.
+
+    def __init__(self, units, memory_steps, emb_dim,
+                 batch_size, dropout=0.0, reuglarization=1e-3, **kwargs):
+        """Short summary.
+
+        Parameters
+        ----------
+        units : type
+            Description of parameter `units`.
+        memory_steps : type
+            Description of parameter `memory_steps`.
+        emb_dim : type
+            Description of parameter `emb_dim`.
+        batch_size : type
+            Description of parameter `batch_size`.
+        dropout : type
+            Description of parameter `dropout`.
+        **kwargs : type
+            Description of parameter `**kwargs`.
+
+        Returns
+        -------
+        type
+            Description of returned object.
 
         """
-        self.memories = []
-        self.memory_type = memory_type
-        self.memory_steps
-        self.attention_type = attention_type
 
+        # TODO: Dropout
 
-        self.output_dim = output_dim
-        self.build(attn_units, attention_type, memory_units, memory_type)
-        super(EpisodicMemoryModule, self).__init__(**kwargs)
+        self.memory_steps = memory_steps
+        self.dropout = dropout
+        self.name = "episodic_memory_module"
+        self._input_map = {}
+        self.supports_masking = True
+        self.units = units
 
-    def build(self, attn_units, attention_type="soft", memory_units, memory_type='GRU'):
+        # attention net.
+        self.l_1 = Dense(units=emb_dim,
+                         batch_size=batch_size,
+                         activation='tanh',
+                         kernel_regularizer=regularizers.l2(reuglarization))
 
-        # Memory parameters for attention and episodes
-        if memory_type == 'GRU':
-            self.memory_net = GRU(units=memory_size)
-        elif memory_type == 'RELU':
-            self.memory_net = Dense(units=memory_size, activation='relu')
+        self.l_2 = Dense(units=1,
+                         batch_size=batch_size,
+                         activation=None,
+                         kernel_regularizer=regularizers.l2(reuglarization))
 
-        if attention_type == 'soft':
-            self.attention_GRU = SoftAtnnGRU(units=attn_units)
-        elif attention_type == 'gate':
-            raise NotImplementedError
+        # Episode net
+        self.episode_GRU = SoftAttnGRU(units=units,
+                                       return_sequences=False,
+                                       batch_size=batch_size,
+                                       kernel_regularizer=regularizers.l2(
+                                           0.001),
+                                       recurrent_regularizer=regularizers.l2(reuglarization))
 
-        # Attention parameters
-        self.W1 = self.add_weight(shape=(attn_units, 4*attn_units),
-                                  name='g_W_1',
-                                  initializer=self.kernel_initializer,
-                                  regularizer=self.kernel_regularizer,
-                                  constraint=self.kernel_constraint,
-                                  trainable=True)
+        # Memory generating net.
+        self.memory_net = Dense(units=units,
+                                activation='relu',
+                                kernel_regularizer=regularizers.l2(reuglarization))
 
-        self.b1 = self.add_weight(shape=self.attn_units,
-                                name='G_bias_1',
-                                initializer=self.bias_initializer,
-                                regularizer=self.bias_regularizer,
-                                constraint=self.bias_constraint,
-                                trainable=True)
+        super(EpisodicMemoryModule, self).__init__()
 
+    def get_config():
+        raise NotImplementedError
 
-        self.W2 = self.add_weight(shape=(1, self.attn_units), # I think.
-                                  name='g_W_2',
-                                  initializer=self.kernel_initializer,
-                                  regularizer=self.kernel_regularizer,
-                                  constraint=self.kernel_constraint,
-                                  trainable=True)
+    def compute_output_shape(self, input_shape):
 
-        self.b2 = self.add_weight(shape=(1,1),
-                                name='G_bias_2',
-                                initializer=self.bias_initializer,
-                                regularizer=self.bias_regularizer,
-                                constraint=self.bias_constraint,
-                                trainable=True)
-        self.built = True
+        q_shape = list(input_shape[1])
+        q_shape[-1] = self.units * 2
+        
+        return tuple(q_shape)
 
+    def build(self, input_shape):
+        super(EpisodicMemoryModule, self).build(input_shape)
 
-    def generate_episode(self, facts, question, memory):
-        episode = K.zeros(shape=facts[0].get_shape())
-        # TODO: Consider stacking these, instead of running with a loop. 
+    def call(self, inputs):
+        """Short summary.
 
-        for f_i in facts:
-            # Attention! Attention! Attention!
-            z_t_0 = K.multiply([f_i, question, memory])
-            z_t_1 = K.abs(K.substract([f_i, question]))
-            z_t_2 = K.abs(K.substract([f_i, memory]))
-            z_t_i = K.concatenate([z_t_0, z_t_1, z_t_2])
-            g_t_i = K.softmax(self.W2 * K.tanh( self.W1 * z_t_i + self.b1) + self.b2)
+        Parameters
+        ----------
+        inputs : type
+            Description of parameter `inputs`.
 
-            episode = self.attention_GRU.call(inputs=f_i, state=episode, attn_gate=g_t_i)[0]
+        Returns
+        -------
+        type
+            Description of returned object.
 
-        return episode
-
-
-    def call(self, facts, question):
+        """
         # TODO: Add Dropout and BatchNorm.
-        self.memories = []
-        # Initialize memory to the question
-        memory = K.identity(question)
-        self.memories.append(memory)
-        for step in self.memory_steps:
-            # iteratively update memory
-            if self.memory_type == 'GRU'
-                memory = self.memory_net.call(self.generate_episode(memory), memory)[0]
-            elif self.memory_type == 'RELU':
-                episode = self.generate_episode(facts, question, memory)
-                memory = self.memory_net.call(K.concatenate([memory, episode, question]))
-                #self.memories.append(memory) # Not sure if this will work
-        return memory
+
+        def compute_attention(fact, question, memory):
+            """Short summary.
+
+            Parameters
+            ----------
+            fact : type
+                Description of parameter `fact`.
+            question : type
+                Description of parameter `question`.
+            memory : type
+                Description of parameter `memory`.
+
+            Returns
+            -------
+            type
+                Description of returned object.
+
+            """
+
+            f_i = [
+                fact * question,
+                fact * memory,
+                K.abs(
+                    fact - question),
+                K.abs(
+                    fact - memory)]
+            g_t_i = self.l_1(K.concatenate(f_i, axis=1))
+            g_t_i = self.l_2(g_t_i)
+            return g_t_i
+
+        facts = inputs[0]
+        question = inputs[1]
+        memory = K.identity(question)   # Initialize memory to the question
+        fact_list = tf.unstack(facts, axis=1)
+
+        for step in range(self.memory_steps):
+
+            # Adapted from
+            # https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow/
+            attentions = [tf.squeeze(
+                compute_attention(fact, question, memory), axis=1)
+                for i, fact in enumerate(fact_list)]
+            attentions = tf.stack(attentions)
+            attentions = tf.transpose(attentions)
+            attentions = tf.nn.softmax(attentions)
+            attentions = tf.expand_dims(attentions, axis=-1)
+
+            episode = K.concatenate([facts, attentions], axis=2)
+            # Last state. Correct? Maybe not
+            episode = self.episode_GRU(episode)
+
+            memory = self.memory_net(K.concatenate(
+                [memory, episode, question], axis=1))
+
+        return K.concatenate([memory, question], axis=1)

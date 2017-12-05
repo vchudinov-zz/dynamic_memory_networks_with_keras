@@ -1,0 +1,18 @@
+{
+  "path_to_train_task": "sample/path",
+  "path_to_test_task": "optional/path",
+  
+  "path_to_embeddings": "sample/embeddings/path",
+  "embeddings_size": 80,
+
+  "model_folder": "path/to/keep/logs",
+  "hidden_units": 80,
+  "memory_steps": 3,
+
+  "epochs": 256,
+  "batch_size": 100,
+  "validation_split": 0.1,
+  "dropout": 0.1,
+  "learning_rate": 0.001,
+  "learning_decay": 0.0
+}
