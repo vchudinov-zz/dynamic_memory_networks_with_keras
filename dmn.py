@@ -96,7 +96,7 @@ class DynamicMemoryNetwork():
 
         stopper = keras.callbacks.EarlyStopping(monitor="loss",
                                                 mode='min',
-                                                patience=30,
+                                                patience=25,
                                                 min_delta=1e-4
                                                 )
 
@@ -148,7 +148,7 @@ class DynamicMemoryNetwork():
         return self.model.predict([x, xq], batch_size=batch_size)
 
     def build_inference_graph(self, input_shape, question_shape, num_classes,
-                              units=256,batch_size=32, memory_steps=3, dropout=0.1, regularization_val=1e-3):
+                              units=256,batch_size=32, memory_steps=3, dropout=0.1, regularization_val=1e-4):
         """Builds the model.
 
         Parameters

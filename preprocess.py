@@ -31,7 +31,7 @@ def get_positional_encoding(max_seq, emb_dim):
     return np.transpose(encoding)
 
 
-def load_embeddings_index(embeddings_path, emb_dim=None):
+def load_embeddings_index(embeddings_path, emb_dim):
     """
     Takne from the Keras blog.
     Loads a  pre-trained embeddings matrix,
@@ -45,14 +45,11 @@ def load_embeddings_index(embeddings_path, emb_dim=None):
 
     embeddings_index = {}
     f = open(embeddings_path, 'r')
-
+    emb_dim = min(emb_dim+1, len(f[0].split()[1:])) # So that if emb_dim is larger, use the max available dim.
     for line in f:
         values = line.split()
         word = values[0]
-        if emb_dim is not None:
-            coefs = values[1:emb_dim+1]
-        else:
-            coefs = values[1:]
+        coefs = values[1:emb_dim]
         coefs = np.asarray(coefs, dtype='float32')
         embeddings_index[word] = coefs
     f.close()
@@ -143,7 +140,7 @@ def vectorize_stories(data, word_idx, story_maxlen, query_maxlen):
     return np.array(xs), pad_sequences(xqs, maxlen=query_maxlen), np.array(ys)
 
 
-def load_dataset( emb_location, babi_location, babi_test_location=None, emb_dim=None):
+def load_dataset( emb_location, babi_location, babi_test_location=None, emb_dim=80):
     # TODO I forgot
     print("----- Loading Embeddings.-----")
     word_index = load_embeddings_index(emb_location, emb_dim)
@@ -164,6 +161,6 @@ def load_dataset( emb_location, babi_location, babi_test_location=None, emb_dim=
     vectorized_stories = vectorize_stories(
         stories, word_index, story_maxlen, query_maxlen)
     if babi_test_location is not None:
-        return vectorized_stories, vectorized_test, story_maxlen
+        return story_maxlen, vectorized_stories, vectorized_test
 
-    return vectorized_stories, story_maxlen
+    return story_maxlen, vectorized_stories, None
