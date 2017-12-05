@@ -1,4 +1,4 @@
-==General Description==
+##General Description##
 
 This is an attempt to implement in Keras the Dynamic Memory Network described in
 https://arxiv.org/pdf/1506.07285.pdf
@@ -6,7 +6,7 @@ https://arxiv.org/pdf/1506.07285.pdf
 Currently it achieves zero test error on tasks 1,4,6. I have not tested it on the bigger tasks,
 due to computational constraints
 
-==What do I need==
+##What do I need##
 
 - python 3.6+
 - Keras 2.0+
@@ -18,7 +18,7 @@ due to computational constraints
 - A file that contains a training task in the format used by babi. You know just use babi - https://research.fb.com/downloads/babi/
 - (Optional) If you want to be proper, a separate test task in the format used by babi - https://research.fb.com/downloads/babi/
 
-==How do I run it?==
+##How do I run it?##
 
 run `python train_and_eval.py --settings <path_to_settings>` Where `<path_to_settings>`
 points to a json file that follows the sample_experiment_settings.json pattern.
@@ -30,7 +30,7 @@ save the weights of the best models. If in the settings you supply a path to a t
 task, in the end of training the model will be evaluated on that and output the
 test accuracy and test loss
 
-==Implementation notes==
+##Implementation notes##
 
 Read the paper at https://arxiv.org/pdf/1506.07285.pdf and https://arxiv.org/pdf/1603.01417.pdf
 
@@ -43,7 +43,7 @@ so please be sure to check it out.
 
 Preprocessing is a modified version of the examples given with Keras.  
 
-==How far along is everything?==
+##How far along is everything?##
 
 - You should be able to run and train on the different babi tasks.
 
@@ -59,6 +59,6 @@ So that part is still work in progress.
 
 - You might run into problems with loading the saved weights - I am still working on that.
 
-==It does not work!/Your code sucks!/Teach me your ways!/Why dont you try adding X?==
+##It does not work!/Your code sucks!/Teach me your ways!/Why dont you try adding X?##
 
 Open an issue, send me a message, etc.
