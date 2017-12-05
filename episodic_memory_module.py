@@ -10,30 +10,31 @@ from keras import regularizers
 
 class EpisodicMemoryModule(Layer):
 
-    def __init__(self, units, memory_steps, emb_dim,
-                 batch_size, dropout=0.0, reuglarization=1e-3, **kwargs):
-        """Short summary.
+    def __init__(self, units,  emb_dim,
+                 batch_size, memory_steps=3, dropout=0.0, reuglarization=1e-3, **kwargs):
+        """Initializes the Episodic Memory Module from
+         https://arxiv.org/pdf/1506.07285.pdf and https://arxiv.org/pdf/1603.01417.pdf.
+
+        The module has internally 2 dense layers used to compute attention,
+        one attention GRU unit, that modifies the layer input based on the computed attention,
+        and finally, one Dense layer that generates the new memory.
+        Have a look at the call method to get an idea of how everything works.
 
         Parameters
         ----------
-        units : type
-            Description of parameter `units`.
-        memory_steps : type
-            Description of parameter `memory_steps`.
-        emb_dim : type
-            Description of parameter `emb_dim`.
-        batch_size : type
-            Description of parameter `batch_size`.
-        dropout : type
-            Description of parameter `dropout`.
-        **kwargs : type
-            Description of parameter `**kwargs`.
-
-        Returns
-        -------
-        type
-            Description of returned object.
-
+        units : (int)
+            The number of hidden units in the attention and memory networks
+        memory_steps : (int)
+            Number of steps to iterate over the input and generate the memory.
+        emb_dim : (int)
+            The size of the embeddings, and thus the number of units for the
+            attention computation
+        batch_size : (int)
+            Size of the batch
+        dropout : (float)
+            The dropout rate for the module
+        **kwargs : (arguments)
+            Extra arguments
         """
 
         # TODO: Dropout
@@ -72,51 +73,52 @@ class EpisodicMemoryModule(Layer):
         super(EpisodicMemoryModule, self).__init__()
 
     def get_config():
+        # TODO: Fix this to allow saving the entire model
         raise NotImplementedError
 
     def compute_output_shape(self, input_shape):
 
         q_shape = list(input_shape[1])
         q_shape[-1] = self.units * 2
-        
+
         return tuple(q_shape)
 
     def build(self, input_shape):
         super(EpisodicMemoryModule, self).build(input_shape)
 
     def call(self, inputs):
-        """Short summary.
+        """Generates a new memory based on thequestion and
+        current inputs.
 
         Parameters
         ----------
-        inputs : type
-            Description of parameter `inputs`.
+        inputs : (list) of (K.Tensor)
+            A list of size two, where each element is a tensor. The first one is
+            the facts vector, and the second - the question vector.
 
         Returns
         -------
-        type
-            Description of returned object.
-
+        K.Tensor
+            A memory generated from the question and fact_vectors
         """
-        # TODO: Add Dropout and BatchNorm.
 
         def compute_attention(fact, question, memory):
-            """Short summary.
+            """Computes an attention score over a single fact vector,
+            question and memoty
 
             Parameters
             ----------
-            fact : type
-                Description of parameter `fact`.
-            question : type
+            fact : (K.tensor)
+                A single fact vector
+            question : (K.tensor)
                 Description of parameter `question`.
-            memory : type
-                Description of parameter `memory`.
+            memory : (K.tensor)
+                The previous memory
 
             Returns
             -------
-            type
-                Description of returned object.
-
+            (K.tensor)
+                The scalar attention score for the current fact.
             """
 
             f_i = [
@@ -139,9 +141,12 @@ class EpisodicMemoryModule(Layer):
 
             # Adapted from
             # https://github.com/barronalex/Dynamic-Memory-Networks-in-TensorFlow/
+
+            # Looks recurrent? In a way it is
             attentions = [tf.squeeze(
                 compute_attention(fact, question, memory), axis=1)
                 for i, fact in enumerate(fact_list)]
+
             attentions = tf.stack(attentions)
             attentions = tf.transpose(attentions)
             attentions = tf.nn.softmax(attentions)

@@ -30,6 +30,11 @@ class SoftAttnGRU(Layer):
                  implementation=1,
                  return_sequences=False,
                  **kwargs):
+        """Identical to keras.recurrent.GRUCell.
+        The difference comes from the computation in self.call
+
+        """
+
 
         super(SoftAttnGRU, self).__init__(**kwargs)
 
@@ -117,6 +122,23 @@ class SoftAttnGRU(Layer):
         super(SoftAttnGRU, self).build(input_shape)
 
     def step(self, inputs, states, training=None):
+        """Computes the output of a single step. Unlike the vanilla GRU, attention is applied to the
+        output, as per https://arxiv.org/pdf/1603.01417.pdf
+        ----------
+        inputs : (K.Tensor)
+            A tensor of shape [batch_size, input_size+1]. The last element of each example is the
+            attention score.
+        states : (K.Tensor)
+            Initial (list) of states
+        training : (bool)
+            Whether the network is in training mode or not. 
+
+        Returns
+        -------
+        (K.Tensor)
+            The output for the current step, modified by attention
+
+        """
             # Needs question as an input
         x_i, attn_gate = array_ops.split(inputs,
                                          num_or_size_splits=[self.units, 1], axis=1)
@@ -194,7 +216,7 @@ class SoftAttnGRU(Layer):
         return h, [h]
 
     def call(self, input_list, initial_state=None, mask=None, training=None):
-        
+
         inputs = input_list
 
         self._generate_dropout_mask(inputs, training=training)
