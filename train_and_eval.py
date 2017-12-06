@@ -25,16 +25,16 @@ question_shape = trainset[1][0].shape
 num_classes = len(trainset[2][0])
 
 print("----- Dataset Loaded. Compiling Model -----")
-dmn_net = DynamicMemoryNetwork(save_folder=settings["save_folder"])
-dmn_net.build_inference_graph(
-    input_shape=input_shape,
-    question_shape=question_shape,
-    num_classes=num_classes,
-    units=settings["hidden_units"],
-    batch_size=settings["batch_size"],
-    memory_steps=settings["memory_steps"],
-    dropout=settings["dropout"],
-    l_2=settings["l_2"])
+dmn_net = DynamicMemoryNetwork(save_folder=settings["save_folder"],
+                               input_shape=input_shape,
+                               question_shape=question_shape,
+                               num_classes=num_classes,
+                               units=settings["hidden_units"],
+                               batch_size=settings["batch_size"],
+                               memory_steps=settings["memory_steps"],
+                               dropout=settings["dropout"],
+                               l_2=settings["l_2"],
+                               weights=None)
 
 print("------ Model Compiled. Training -------")
 

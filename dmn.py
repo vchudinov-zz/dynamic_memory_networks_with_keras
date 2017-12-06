@@ -21,7 +21,16 @@ class DynamicMemoryNetwork():
     An attempt to implement the Dynamic Memory Network from https://arxiv.org/pdf/1603.01417.pdf using keras
     """
 
-    def __init__(self, save_folder):
+    def __init__(self, save_folder,
+                 input_shape,
+                 question_shape,
+                 num_classes,
+                 units=256,batch_size=32,
+                 memory_steps=3,
+                 dropout=0.1,
+                 l_2=1e-3,
+                 weights=None):
+
         """Short summary.
 
         Parameters
@@ -38,6 +47,18 @@ class DynamicMemoryNetwork():
         self.log_folder = os.path.join(save_folder, "log")
         if not os.path.exists(self.log_folder):
             os.makedirs(self.log_folder)
+
+        self.build_inference_graph(input_shape,
+                                  question_shape,
+                                  num_classes,
+                                  units,
+                                  batch_size,
+                                  memory_steps,
+                                  dropout,
+                                  l_2,
+                                  weights)
+        self.model_compiled = False
+
 
     def fit(self,
             train_x,
@@ -78,7 +99,8 @@ class DynamicMemoryNetwork():
 
         """
 
-        opt = optimizers.Adam(lr=l_rate, decay=l_decay, clipvalue=10.)
+
+
         checkpoint = keras.callbacks.ModelCheckpoint(self.model_path,
                                                      monitor=save_criteria,
                                                      verbose=1,
@@ -98,12 +120,10 @@ class DynamicMemoryNetwork():
                                                 mode='min',
                                                 patience=25,
                                                 min_delta=1e-4
-                                                )
 
-        self.model.compile(
-            optimizer=opt,
-            loss="categorical_crossentropy",
-            metrics=["categorical_accuracy"])
+                                              )
+
+        self.compile_model(l_rate, l_decay)
         print(f'Metrics: {self.model.metrics_names}')
         train_history = self.model.fit(x={'input_tensor': train_x,
                                           'question_tensor': train_q},
@@ -114,6 +134,16 @@ class DynamicMemoryNetwork():
                                        epochs=epochs)
         self.model.save_weights(self.model_path + "_trained")
         return train_history
+
+    def compile_model(self, l_rate, l_decay):
+        assert self.model is not None
+        if not self.model_compiled:
+            opt = optimizers.Adam(lr=l_rate, decay=l_decay, clipvalue=10.)
+            self.model.compile(
+                optimizer=opt,
+                loss="categorical_crossentropy",
+                metrics=["categorical_accuracy"])
+            self.model_compiled = True
 
     def validate_model(self, x_val, xq_val, y_val):
         """
@@ -136,19 +166,19 @@ class DynamicMemoryNetwork():
             Validation set accuracy
         """
 
+        self.compile_model(0.0, 0.0)
+
         loss, acc = model.evaluate([x_val, xq_val], y_val,
                                    batch_size=self.batch_size)
+
         return loss, acc
 
-    def load(self, model_path):
-        self.model = load_model(model_path)
-        raise NotImplementedError
-
     def predict(self, x, xq, batch_size=1):
+        self.compile_model(0.0, 0.0)
         return self.model.predict([x, xq], batch_size=batch_size)
 
     def build_inference_graph(self, input_shape, question_shape, num_classes,
-                              units=256,batch_size=32, memory_steps=3, dropout=0.1, l_2=1e-4):
+                              units=256,batch_size=32, memory_steps=3, dropout=0.1, l_2=1e-3, weights=None):
         """Builds the model.
 
         Parameters
@@ -169,6 +199,11 @@ class DynamicMemoryNetwork():
             Number of steps to take when generating new memories
         dropout : (float)
             The dropout rate for the model.
+        l_2 : (float)
+            L_2 regularization is applied on all layers. This parameter specifies the rate
+        weights : (str)
+            Path to saved model weights. If specified, will attempt to load them into the model.
+            Leave to None for new models.
 
         Returns
         -------
@@ -234,3 +269,6 @@ class DynamicMemoryNetwork():
                 inputs_tensor,
                 question_tensor],
             outputs=answer)
+        # If weights is passed load them into the model.
+        if weights is not None:
+            self.model.load_weights(weights)
