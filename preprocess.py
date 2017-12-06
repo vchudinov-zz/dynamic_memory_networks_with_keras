@@ -44,7 +44,8 @@ def load_embeddings_index(embeddings_path, emb_dim):
     """
 
     embeddings_index = {}
-    f = open(embeddings_path, 'r')
+    f = open(embeddings_path, 'r').readlines()
+
     emb_dim = min(emb_dim+1, len(f[0].split()[1:])) # So that if emb_dim is larger, use the max available dim.
     for line in f:
         values = line.split()
@@ -52,7 +53,6 @@ def load_embeddings_index(embeddings_path, emb_dim):
         coefs = values[1:emb_dim]
         coefs = np.asarray(coefs, dtype='float32')
         embeddings_index[word] = coefs
-    f.close()
     embeddings_index["<eos>"] = np.random.rand(len(coefs))
     return embeddings_index
 
@@ -140,18 +140,20 @@ def vectorize_stories(data, word_idx, story_maxlen, query_maxlen):
     return np.array(xs), pad_sequences(xqs, maxlen=query_maxlen), np.array(ys)
 
 
-def load_dataset( emb_location, babi_location, babi_test_location=None, emb_dim=80):
+def load_dataset( embeddings_location, train_task_location, test_task_location=None, emb_dim=80):
     # TODO I forgot
     print("----- Loading Embeddings.-----")
-    word_index = load_embeddings_index(emb_location, emb_dim)
+    word_index = load_embeddings_index(embeddings_location, emb_dim)
     print("----- Retrieving Stories. -----")
-    stories = get_stories(open(babi_location, 'r'))
+    stories = get_stories(open(train_task_location, 'r'))
+    vectorized_test=None
+
     story_maxlen = max(map(len, (x for x, _, _ in stories)))
     query_maxlen = max(map(len, (x for _, x, _ in stories)))
 
 
-    if babi_test_location is not None:
-        test_stories = get_stories(open(babi_test_location, 'r'))
+    if len(test_task_location) > 1:
+        test_stories = get_stories(open(test_task_location, 'r'))
         test_story_maxlen = max(map(len, (x for x, _, _ in test_stories)))
         test_query_maxlen = max(map(len, (x for _, x, _ in test_stories)))
         story_maxlen = max(story_maxlen, test_story_maxlen)
@@ -160,7 +162,4 @@ def load_dataset( emb_location, babi_location, babi_test_location=None, emb_dim=
 
     vectorized_stories = vectorize_stories(
         stories, word_index, story_maxlen, query_maxlen)
-    if babi_test_location is not None:
-        return story_maxlen, vectorized_stories, vectorized_test
-
-    return story_maxlen, vectorized_stories, None
+    return story_maxlen, vectorized_stories, vectorized_test

@@ -1,18 +1,19 @@
 {
-  "path_to_train_task": "sample/path",
-  "path_to_test_task": "optional/path",
-  
-  "path_to_embeddings": "sample/embeddings/path",
+  "train_task_location": "/train/task/location",
+  "test_task_location": "/optional/test/task/location",
+
+  "embeddings_location": "/word/embeddings/location",
   "embeddings_size": 80,
 
-  "model_folder": "path/to/keep/logs",
+  "save_folder": "/folder/to/save/logs/and/weights",
   "hidden_units": 80,
   "memory_steps": 3,
 
-  "epochs": 256,
+  "epochs": 10,
   "batch_size": 100,
   "validation_split": 0.1,
   "dropout": 0.1,
+  "l_2": 0.001,
   "learning_rate": 0.001,
   "learning_decay": 0.0
 }

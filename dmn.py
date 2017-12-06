@@ -148,7 +148,7 @@ class DynamicMemoryNetwork():
         return self.model.predict([x, xq], batch_size=batch_size)
 
     def build_inference_graph(self, input_shape, question_shape, num_classes,
-                              units=256,batch_size=32, memory_steps=3, dropout=0.1, regularization_val=1e-4):
+                              units=256,batch_size=32, memory_steps=3, dropout=0.1, l_2=1e-4):
         """Builds the model.
 
         Parameters
@@ -197,8 +197,8 @@ class DynamicMemoryNetwork():
                         return_sequences=True,
                         stateful=True,
                         batch_size=batch_size,
-                        kernel_regularizer=regularizers.l2(regularization_val),
-                        recurrent_regularizer=regularizers.l2(regularization_val)
+                        kernel_regularizer=regularizers.l2(l_2),
+                        recurrent_regularizer=regularizers.l2(l_2)
                         )
 
         facts = Bidirectional(gru_layer, merge_mode='sum')(inputs_tensor)
@@ -211,15 +211,15 @@ class DynamicMemoryNetwork():
 
         question = GRU(units=units, stateful=True, return_sequences=False,
                        batch_size=batch_size,
-                       kernel_regularizer=regularizers.l2(regularization_val),
-                       recurrent_regularizer=regularizers.l2(regularization_val))(question_tensor)
+                       kernel_regularizer=regularizers.l2(l_2),
+                       recurrent_regularizer=regularizers.l2(l_2))(question_tensor)
 
         answer = EpisodicMemoryModule(
             units=units,
             batch_size=batch_size,
             emb_dim=emb_dim,
             memory_steps=memory_steps,
-            regularization=regularization_val)([facts, question])
+            regularization=l_2)([facts, question])
 
         answer = Dropout(dropout)(answer)
 
@@ -227,7 +227,7 @@ class DynamicMemoryNetwork():
             units=num_classes,
             batch_size=batch_size,
             activation="softmax",
-            kernel_regularizer=regularizers.l2(regularization_val))(answer)
+            kernel_regularizer=regularizers.l2(l_2))(answer)
 
         self.model = Model(
             inputs=[

@@ -5,25 +5,27 @@ import json
 import argparse
 
 parser = argparse.ArgumentParser(description='DMN+ Trainer')
-parser.add_argument('--settings_file', type=str,
+parser.add_argument('--settings', type=str,
                     help='path to a json with settings')
 
 settings = parser.parse_args()
-settings = json.loads(open(settings['--settings_file'], 'r'))
+
+
+settings = json.load(open(settings.settings, 'r'))
 
 print("----- Loading Dataset ----")
 
-max_len, trainset, testset = load_dataset(emb_location=settings["path_to_embeddings"],
-                                           babi_location=settings["path_to_train_task"],
-                                           babi_test_location=settings["path_to_test_task"],
-                                           emb_dim=settings["embeddings_size"])
+max_len, trainset, testset = load_dataset(embeddings_location=settings["embeddings_location"],
+                                          train_task_location=settings["train_task_location"],
+                                          test_task_location=settings["test_task_location"],
+                                          emb_dim=settings["embeddings_size"])
 
 input_shape = trainset[0][0].shape
 question_shape = trainset[1][0].shape
 num_classes = len(trainset[2][0])
 
 print("----- Dataset Loaded. Compiling Model -----")
-dmn_net = DynamicMemoryNetwork(save_folder=model_folder)
+dmn_net = DynamicMemoryNetwork(save_folder=settings["save_folder"])
 dmn_net.build_inference_graph(
     input_shape=input_shape,
     question_shape=question_shape,
@@ -31,7 +33,8 @@ dmn_net.build_inference_graph(
     units=settings["hidden_units"],
     batch_size=settings["batch_size"],
     memory_steps=settings["memory_steps"],
-    dropout=settings["dropout"])
+    dropout=settings["dropout"],
+    l_2=settings["l_2"])
 
 print("------ Model Compiled. Training -------")
 
