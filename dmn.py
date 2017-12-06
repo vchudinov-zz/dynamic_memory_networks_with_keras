@@ -37,6 +37,27 @@ class DynamicMemoryNetwork():
         ----------
         save_folder : (str)
             Locaiton where the model and logs will be saved
+        input_shape : (tuple) or (list)
+            A tuple or list specifying the shape of an individual input example
+            Excludes batch size
+        question_shape : (tuple) or (list)
+            A tuple or list specifying the shape of an individual question example.
+            Excludes batch size
+        num_classes : (int)
+            The number of possible output classes
+        units : (int)
+            Number of hidden units. Used for all layers
+        batch_size : (int)
+            Batch Size.
+        memory_steps : (int)
+            Number of steps to take when generating new memories
+        dropout : (float)
+            The dropout rate for the model.
+        l_2 : (float)
+            L_2 regularization is applied on all layers. This parameter specifies the rate
+        weights : (str)
+            Path to saved model weights. If specified, will attempt to load them into the model.
+            Leave to None for new models.
 
         Returns
         -------
