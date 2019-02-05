@@ -13,7 +13,8 @@ class SoftAttnGRU(Layer):
 
     def __init__(self,
                  units,
-                 activation='tanh',
+                 activation='sigmoid',
+                 batch_size=0,
                  recurrent_activation='hard_sigmoid',
                  use_bias=True,
                  kernel_initializer='glorot_uniform',
@@ -32,12 +33,11 @@ class SoftAttnGRU(Layer):
                  **kwargs):
         """Identical to keras.recurrent.GRUCell.
         The difference comes from the computation in self.call
-
         """
 
 
         super(SoftAttnGRU, self).__init__(**kwargs)
-
+        self.batch_size = batch_size
         self.units = units
         self.return_sequences = return_sequences
         self.activation = activations.get(activation)
@@ -225,14 +225,12 @@ class SoftAttnGRU(Layer):
         # if has_arg(self.layer.call, 'training'):
         self.training = training
         uses_learning_phase = False
-        initial_state = self.get_initial_state(inputs)
-
-        input_shape = K.int_shape(inputs)
+      #  initial_state = self.get_initial_state(inputs)
         last_output, outputs, _ = K.rnn(self.step,
                                         inputs=inputs,
                                         constants=[],
-                                        initial_states=initial_state,
-                                        input_length=input_shape[1],
+                                        initial_states=[K.zeros(shape= [self.batch_size, self.units])],
+                                        #input_length=input_shape,
                                         unroll=False)
         if self.return_sequences:
             y = outputs
@@ -286,13 +284,20 @@ class SoftAttnGRU(Layer):
             self._recurrent_dropout_mask = None
 
     def get_initial_state(self, inputs):
+        return K.zeros(shape= [self.batch_size, self.units])
         # build an all-zero tensor of shape (samples, output_dim)
-        initial_state = K.zeros_like(inputs)  # (samples, timesteps, input_dim)
-        initial_state = initial_state[:, :, :-1]
-        initial_state = K.sum(initial_state, axis=(1, 2))  # (samples,)
-        initial_state = K.expand_dims(initial_state)  # (samples, 1)
-        if hasattr(self.state_size, '__len__'):
-            return [K.tile(initial_state, [1, dim])
-                    for dim in self.state_size]
-        else:
-            return [K.tile(initial_state, [1, self.state_size])]
+        # What the hell am I doing here?
+      #  print("--------------------")
+       # initial_state = K.zeros_like(inputs)  # (samples, timesteps, input_dim)
+      #  print(initial_state.shape)
+      #  initial_state = initial_state[:, :, :-1]
+        #initial_state = K.sum(initial_state, axis=(1, 2))  # (samples,)
+        #print(initial_state.shape)
+        #initial_state = K.expand_dims(initial_state)  # (samples, 1)
+        #print(initial_state.shape)
+        #raise SystemExit
+      #  if hasattr(self.state_size, '__len__'):
+      #      return [K.tile(initial_state, [1, dim])
+       #             for dim in self.state_size]
+       # else:
+        #    return [K.tile(initial_state, [1, self.state_size])]

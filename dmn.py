@@ -3,13 +3,13 @@ import keras
 import numpy as np
 import os
 from keras.models import Model
-from keras.layers import Dense, Dropout, Input
+from keras.layers import Dense, Dropout, Input, Activation, Concatenate
 from keras import optimizers
 from episodic_memory_module import EpisodicMemoryModule
 from keras.layers import Bidirectional, Dropout
 from keras.layers.recurrent import GRU
 from keras import regularizers
-
+from keras.utils import plot_model
 from keras import backend as K
 # TODO: Saving and deploying
 # TODO: What about recurrent activation of memories?
@@ -78,14 +78,15 @@ class DynamicMemoryNetwork():
 
         """
 
-        opt = optimizers.Adam(lr=l_rate, decay=l_decay, clipvalue=10.)
+        opt = optimizers.Adam(lr=l_rate)
+       # opt = optimizers.SGD(lr=l_rate, decay=l_decay)
         checkpoint = keras.callbacks.ModelCheckpoint(self.model_path,
                                                      monitor=save_criteria,
                                                      verbose=1,
                                                      save_best_only=True,
                                                      save_weights_only=True,
                                                      mode=save_criteria_mode,
-                                                     period=1)
+                                                     period=20)
 
         logger = keras.callbacks.CSVLogger(
             os.path.join(
@@ -96,7 +97,7 @@ class DynamicMemoryNetwork():
 
         stopper = keras.callbacks.EarlyStopping(monitor="loss",
                                                 mode='min',
-                                                patience=25,
+                                                patience=100,
                                                 min_delta=1e-4
                                                 )
 
@@ -105,6 +106,11 @@ class DynamicMemoryNetwork():
             loss="categorical_crossentropy",
             metrics=["categorical_accuracy"])
         print(f'Metrics: {self.model.metrics_names}')
+        plot_model(self.model, to_file='model.png', show_shapes=True)
+        print(self.model.summary())
+        #raise SystemExit
+
+
         train_history = self.model.fit(x={'input_tensor': train_x,
                                           'question_tensor': train_q},
                                        y=train_y,
@@ -136,19 +142,20 @@ class DynamicMemoryNetwork():
             Validation set accuracy
         """
 
-        loss, acc = model.evaluate([x_val, xq_val], y_val,
+        loss, acc = self.model.evaluate([x_val, xq_val], y_val,
                                    batch_size=self.batch_size)
         return loss, acc
 
     def load(self, model_path):
-        self.model = load_model(model_path)
+        self.model = self.model.load_model(model_path)
         raise NotImplementedError
 
     def predict(self, x, xq, batch_size=1):
         return self.model.predict([x, xq], batch_size=batch_size)
 
     def build_inference_graph(self, input_shape, question_shape, num_classes,
-                              units=256,batch_size=32, memory_steps=3, dropout=0.1, regularization_val=1e-4):
+                              units=256, batch_size=32, memory_steps=3, dropout=0.1,
+                              regularization_val=1e-4):
         """Builds the model.
 
         Parameters
@@ -178,56 +185,49 @@ class DynamicMemoryNetwork():
         assert(batch_size is not None)
 
         emb_dim = input_shape[-1]
+
         self.batch_size = batch_size
 
         inputs_tensor = Input(
-            batch_shape=(
-                batch_size,
-            ) + input_shape,
+            shape = input_shape,
             name='input_tensor')
 
         question_tensor = Input(
-            batch_shape=(
-                batch_size,
-            ) + question_shape,
+            shape = question_shape,
             name='question_tensor')
 
         gru_layer = GRU(units=units,
-                        dropout=dropout,
                         return_sequences=True,
-                        stateful=True,
-                        batch_size=batch_size,
+                        input_shape = inputs_tensor.shape,
                         kernel_regularizer=regularizers.l2(regularization_val),
                         recurrent_regularizer=regularizers.l2(regularization_val)
                         )
 
         facts = Bidirectional(gru_layer, merge_mode='sum')(inputs_tensor)
         facts = Dropout(dropout)(facts)
-
-        # Fix the time dimension
         facts_shape = list(K.int_shape(facts))
         facts_shape[1] = input_shape[0]
         facts.set_shape(facts_shape)
 
-        question = GRU(units=units, stateful=True, return_sequences=False,
-                       batch_size=batch_size,
+        question = GRU(units=units,
                        kernel_regularizer=regularizers.l2(regularization_val),
                        recurrent_regularizer=regularizers.l2(regularization_val))(question_tensor)
+        question = Dropout(dropout)(question)
 
-        answer = EpisodicMemoryModule(
+        memory = EpisodicMemoryModule(
             units=units,
             batch_size=batch_size,
             emb_dim=emb_dim,
             memory_steps=memory_steps,
-            regularization=regularization_val)([facts, question])
+            dropout=dropout,
+            reuglarization=regularizers.l2(regularization_val))([facts, question])
 
-        answer = Dropout(dropout)(answer)
+        memory = Dropout(dropout)(memory)
+        memory = Concatenate(axis=1)([question, memory])
 
         answer = Dense(
             units=num_classes,
-            batch_size=batch_size,
-            activation="softmax",
-            kernel_regularizer=regularizers.l2(regularization_val))(answer)
+            activation="softmax")(memory)
 
         self.model = Model(
             inputs=[

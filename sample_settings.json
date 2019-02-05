@@ -16,3 +16,6 @@
   "learning_rate": 0.001,
   "learning_decay": 0.0
 }
+ValueError: invalid literal for int() with base 10: 'bathroom'
+
+62daf22766db1f4fa766ef40f1c4e28b5fd26d26
